@@ -1,7 +1,7 @@
--- ФАЙЛ: loader.lua (ОБНОВЛЕННЫЙ)
+-- ФАЙЛ: loader.lua (ОБНОВЛЕННЫЙ С УТИЛИТОЙ)
 print("[UNDERTALE] ========================================")
 print("[UNDERTALE] Начало загрузки улучшенной боевой системы...")
-print("[UNDERTALE] Версия: 2.0 (Сетка врагов)")
+print("[UNDERTALE] Версия: 2.0 (Сетка врагов + Утилита спавн-меню)")
 print("[UNDERTALE] ========================================")
 
 -- 1. Конфигурация (самый первый)
@@ -42,33 +42,26 @@ include("ut_battle_music.lua")
 AddCSLuaFile("ut_battle_trigger.lua")
 include("ut_battle_trigger.lua")
 
--- 9. Основной файл
+-- 9. УТИЛИТА СПАВН-МЕНЮ (НОВЫЙ ФАЙЛ)
+AddCSLuaFile("ut_spawnmenu.lua")
+include("ut_spawnmenu.lua")
+
+-- 10. Основной файл
 AddCSLuaFile("ut_battle_main.lua")
 include("ut_battle_main.lua")
 
--- 10. Исправления
+-- 11. Исправления
 AddCSLuaFile("ut_fixes.lua")
 include("ut_fixes.lua")
 
-print("[UNDERTALE] ========================================")
-print("[UNDERTALE] Все модули улучшенной системы загружены!")
-print("[UNDERTALE] Команды:")
-print("[UNDERTALE]   ut_menu - Открыть меню боя")
-print("[UNDERTALE]   ut_heart - Тест фазы сердца")
-print("[UNDERTALE]   ut_close - Закрыть меню")
-print("[UNDERTALE]   ut_debug - Отладка")
-print("[UNDERTALE]   ut_test_panel_heart - Тест сердца в панели")
-print("[UNDERTALE]   ut_reset_triggers - Сбросить триггеры")
-print("[UNDERTALE]   ut_test_music - Тест музыки")
-print("[UNDERTALE]   ut_stop_music - Остановить музыку")
-print("[UNDERTALE] ========================================")
+
 
 -- Автосообщение
 timer.Simple(10, function()
     chat.AddText(Color(0, 255, 255), "[UNDERTALE] ", Color(255, 255, 255), 
-        "Улучшенная боевая система загружена! Введите ut_menu")
-    chat.AddText(Color(255, 255, 0), "[СИСТЕМА] ", Color(255, 255, 255), 
-        "Подойдите к NPC для автоматического боя или используйте ut_menu")
-    chat.AddText(Color(200, 255, 200), "[НОВОЕ] ", Color(255, 255, 255), 
-        "Сетка врагов, навигация стрелками, автоматическое управление!")
+        "Улучшенная боевая система загружена!")
+    chat.AddText(Color(255, 255, 0), "[УПРАВЛЕНИЕ] ", Color(255, 255, 255), 
+        "Панель управления: Меню -> Utilities -> Undertale")
+    chat.AddText(Color(200, 200, 255), "[F8] ", Color(255, 255, 255), 
+        "Нажмите F8 для быстрого включения/отключения аддона")
 end)
