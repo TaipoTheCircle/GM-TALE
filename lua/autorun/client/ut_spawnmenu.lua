@@ -4,13 +4,70 @@
 if CLIENT then
     print("[UNDERTALE] Загрузка утилиты спавн-меню...")
     
+    -- Глобальные переменные
+    UT_ADDON_ENABLED = true
+    local trigger_enabled = true
+    
+    -- Функция для отключения систем без сообщений
+    local function UT_DisableAddonSystems()
+        if UT_BATTLE_CORE and UT_BATTLE_CORE.StopAllSystems then
+            UT_BATTLE_CORE.StopAllSystems()
+        end
+        
+        if UT_BATTLE_MUSIC and UT_BATTLE_MUSIC.Stop then
+            UT_BATTLE_MUSIC.Stop()
+        end
+        
+        if UT_HEART_SIMPLE and UT_HEART_SIMPLE.Stop then
+            UT_HEART_SIMPLE.Stop()
+        end
+        
+        if UT_HEART_CORE and UT_HEART_CORE.StopHeartPhase then
+            UT_HEART_CORE.StopHeartPhase()
+        end
+        
+        hook.Remove("Think", "UT_BattleTrigger")
+        hook.Remove("Think", "UT_AttackThink")
+        hook.Remove("Think", "UT_HeartPhaseThink")
+        hook.Remove("Think", "UT_SimpleHeart_Think")
+        hook.Remove("HUDPaint", "UT_HeartPhaseDraw")
+        hook.Remove("Think", "UT_UpdateEnemiesGrid")
+        
+        timer.Remove("UT_BattleTrigger")
+        timer.Remove("UT_CheckDeadEnemies")
+        timer.Remove("UT_HeartBulletTimer")
+        timer.Remove("UT_SimpleHeart_Bullets")
+        timer.Remove("UT_MusicTimer")
+        timer.Remove("UT_MusicRestartTimer")
+    end
+    
+    -- Загружаем сохраненные настройки
+    local function UT_LoadSettings()
+        local saved = cookie.GetString("ut_addon_enabled", "true")
+        UT_ADDON_ENABLED = (saved == "true")
+        
+        local trigger_saved = cookie.GetString("ut_trigger_enabled", "true")
+        trigger_enabled = (trigger_saved == "true")
+        
+        print("[UNDERTALE] Загружены настройки: аддон=" .. tostring(UT_ADDON_ENABLED) .. ", триггер=" .. tostring(trigger_enabled))
+        
+        if not UT_ADDON_ENABLED then
+            UT_DisableAddonSystems()
+        end
+        
+        if not trigger_enabled then
+            hook.Remove("Think", "UT_BattleTrigger")
+            timer.Remove("UT_BattleTrigger")
+        elseif UT_BATTLE_TRIGGER and UT_BATTLE_TRIGGER.Initialize then
+            UT_BATTLE_TRIGGER.Initialize()
+        end
+    end
+    
     -- Создаем вкладку в спавн-меню
     hook.Add("PopulateToolMenu", "UT_PopulateSpawnMenu", function()
-        -- Создаем панель в настройках (Settings -> Undertale)
         spawnmenu.AddToolMenuOption("Utilities", "Undertale", "UT_ControlPanel", 
             "Управление Undertale", "", "", function(panel)
             
-            -- Заголовок
             panel:AddControl("Label", {
                 Text = "══════════════════════════════════════",
                 Description = "Панель управления боевой системой Undertale"
@@ -21,11 +78,10 @@ if CLIENT then
                 Description = "Включение/отключение системы"
             })
             
-            -- Кнопка включения/отключения
             panel:AddControl("Button", {
                 Label = "🔴 ПОЛНОСТЬЮ ОТКЛЮЧИТЬ АДДОН",
                 Command = "ut_disable_all",
-                Description = "Отключает всю систему Undertale (авто-бой, триггеры, меню)"
+                Description = "Отключает всю систему Undertale (настройки сохранятся)"
             })
             
             panel:AddControl("Button", {
@@ -39,7 +95,6 @@ if CLIENT then
                 Description = ""
             })
             
-            -- Раздел ручного управления
             panel:AddControl("Label", {
                 Text = "РУЧНОЕ УПРАВЛЕНИЕ",
                 Description = "Запуск/остановка компонентов вручную"
@@ -68,7 +123,6 @@ if CLIENT then
                 Description = ""
             })
             
-            -- Музыка
             panel:AddControl("Label", {
                 Text = "МУЗЫКА",
                 Description = "Управление музыкой"
@@ -101,7 +155,6 @@ if CLIENT then
                 Description = ""
             })
             
-            -- Триггеры
             panel:AddControl("Label", {
                 Text = "ТРИГГЕРЫ БОЯ",
                 Description = "Управление авто-боем"
@@ -124,7 +177,6 @@ if CLIENT then
                 Description = ""
             })
             
-            -- Отладка
             panel:AddControl("Label", {
                 Text = "ОТЛАДКА",
                 Description = "Инструменты для разработчиков"
@@ -153,110 +205,67 @@ if CLIENT then
                 Description = ""
             })
             
-            -- Информация
             panel:AddControl("Label", {
                 Text = "ИНФОРМАЦИЯ",
                 Description = "Текущее состояние системы"
             })
             
             panel:AddControl("Label", {
-                Text = "Версия: 2.0 (Упрощенная сетка)",
+                Text = "Версия: 2.1 (Сохранение настроек)",
                 Description = ""
             })
             
-            -- Кнопка обновления статуса
             panel:AddControl("Button", {
                 Label = "🔄 ОБНОВИТЬ СТАТУС",
                 Command = "ut_update_status",
                 Description = "Обновить информацию о состоянии"
             })
-            
-            -- Добавляем текстовое поле для статуса
-            panel:AddControl("Label", {
-                Text = "Статус: Загружается...",
-                Description = "",
-                Command = "ut_status_text"
-            })
         end)
     end)
     
-    -- Переменные для отслеживания состояния
-    UT_ADDON_ENABLED = true
-    
-    -- Команда полного отключения аддона
+    -- Команда полного отключения аддона (С СОХРАНЕНИЕМ)
     concommand.Add("ut_disable_all", function()
         print("[UNDERTALE] ===== ПОЛНОЕ ОТКЛЮЧЕНИЕ АДДОНА =====")
         
-        -- Останавливаем все системы
-        if UT_BATTLE_CORE and UT_BATTLE_CORE.StopAllSystems then
-            UT_BATTLE_CORE.StopAllSystems()
-        end
-        
-        -- Останавливаем музыку
-        if UT_BATTLE_MUSIC and UT_BATTLE_MUSIC.Stop then
-            UT_BATTLE_MUSIC.Stop()
-        end
-        
-        -- Останавливаем сердце
-        if UT_HEART_SIMPLE and UT_HEART_SIMPLE.Stop then
-            UT_HEART_SIMPLE.Stop()
-        end
-        if UT_HEART_CORE and UT_HEART_CORE.StopHeartPhase then
-            UT_HEART_CORE.StopHeartPhase()
-        end
-        
-        -- Удаляем все хуки
-        hook.Remove("Think", "UT_BattleTrigger")
-        hook.Remove("Think", "UT_AttackThink")
-        hook.Remove("Think", "UT_HeartPhaseThink")
-        hook.Remove("Think", "UT_SimpleHeart_Think")
-        hook.Remove("HUDPaint", "UT_HeartPhaseDraw")
-        hook.Remove("Think", "UT_UpdateEnemiesGrid")
-        
-        -- Удаляем все таймеры
-        timer.Remove("UT_BattleTrigger")
-        timer.Remove("UT_CheckDeadEnemies")
-        timer.Remove("UT_HeartBulletTimer")
-        timer.Remove("UT_SimpleHeart_Bullets")
-        timer.Remove("UT_MusicTimer")
-        timer.Remove("UT_MusicRestartTimer")
-        
-        -- Отключаем триггер
         UT_ADDON_ENABLED = false
+        cookie.Set("ut_addon_enabled", "false")
+        
+        UT_DisableAddonSystems()
         
         chat.AddText(Color(255, 0, 0), "[UNDERTALE] ", Color(255, 255, 255), 
-            "Аддон ПОЛНОСТЬЮ ОТКЛЮЧЕН! Авто-бой не будет работать.")
+            "Аддон ПОЛНОСТЬЮ ОТКЛЮЧЕН! Настройки сохранены.")
         chat.AddText(Color(255, 200, 0), "[ПОДСКАЗКА] ", Color(255, 255, 255), 
-            "Для включения используйте 'ut_enable_all'")
+            "Для включения используйте 'ut_enable_all' или F8")
         
-        print("[UNDERTALE] Аддон полностью отключен")
+        print("[UNDERTALE] Аддон полностью отключен (сохранено)")
     end)
     
-    -- Команда включения аддона
+    -- Команда включения аддона (С СОХРАНЕНИЕМ)
     concommand.Add("ut_enable_all", function()
         print("[UNDERTALE] ===== ВКЛЮЧЕНИЕ АДДОНА =====")
         
         UT_ADDON_ENABLED = true
+        cookie.Set("ut_addon_enabled", "true")
         
-        -- Перезапускаем триггер если он существует
         if UT_BATTLE_TRIGGER and UT_BATTLE_TRIGGER.Initialize then
             UT_BATTLE_TRIGGER.Initialize()
         end
         
         chat.AddText(Color(0, 255, 0), "[UNDERTALE] ", Color(255, 255, 255), 
-            "Аддон ВКЛЮЧЕН! Система работает в обычном режиме.")
+            "Аддон ВКЛЮЧЕН! Настройки сохранены.")
         
-        print("[UNDERTALE] Аддон включен")
+        print("[UNDERTALE] Аддон включен (сохранено)")
     end)
     
-    -- Команда переключения триггера
-    local trigger_enabled = true
+    -- Команда переключения триггера (С СОХРАНЕНИЕМ)
     concommand.Add("ut_toggle_trigger", function(ply, cmd, args)
         if args and #args > 0 then
             trigger_enabled = tobool(args[1])
         else
             trigger_enabled = not trigger_enabled
         end
+        
+        cookie.Set("ut_trigger_enabled", tostring(trigger_enabled))
         
         if trigger_enabled then
             if UT_BATTLE_TRIGGER and UT_BATTLE_TRIGGER.Initialize then
@@ -289,7 +298,6 @@ if CLIENT then
         
         chat.AddText(Color(0, 255, 255), "[СТАТУС] ", Color(255, 255, 255), status_text)
         
-        -- Выводим в консоль детальную информацию
         print("=== UNDERTALE STATUS ===")
         print("Аддон включен:", UT_ADDON_ENABLED)
         print("Бой активен:", UT_BATTLE_CORE and UT_BATTLE_CORE.battleActive)
@@ -301,10 +309,8 @@ if CLIENT then
     end)
     
     -- Модифицируем триггер чтобы он учитывал состояние аддона
-    -- Сохраняем оригинальную функцию
     local originalFindEnemies = UT_BATTLE_TRIGGER and UT_BATTLE_TRIGGER.FindEnemies
     
-    -- Переопределяем функцию поиска врагов с проверкой
     if UT_BATTLE_TRIGGER then
         UT_BATTLE_TRIGGER.FindEnemies = function()
             if not UT_ADDON_ENABLED then 
@@ -317,7 +323,7 @@ if CLIENT then
         end
     end
     
-    -- Добавляем клавишу быстрого отключения (F8)
+    -- Клавиша быстрого отключения (F8)
     hook.Add("PlayerButtonDown", "UT_ToggleKey", function(ply, key)
         if key == KEY_F8 then
             if UT_ADDON_ENABLED then
@@ -329,6 +335,12 @@ if CLIENT then
         end
     end)
     
+    -- Загружаем настройки при старте
+    timer.Simple(1, function()
+        UT_LoadSettings()
+    end)
+    
     print("[UNDERTALE] Утилита спавн-меню загружена! Используйте F8 для быстрого отключения.")
     print("[UNDERTALE] Панель управления доступна: Меню -> Utilities -> Undertale")
+    print("[UNDERTALE] НАСТРОЙКИ СОХРАНЯЮТСЯ! При перезапуске аддон запомнит состояние.")
 end
