@@ -162,6 +162,7 @@ if CLIENT then
         
         TRACKS = {
             DEFAULT = {
+                "undertale/bring_it_in_guys!.mp3", 
                 "undertale/enemy_approaching.mp3",
                 "undertale/enemy_retreating.mp3", 
                 "undertale/enemy_approaching_classic.mp3"

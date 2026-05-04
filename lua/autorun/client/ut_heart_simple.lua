@@ -1,4 +1,4 @@
--- ФАЙЛ: ut_heart_simple.lua (ИСПРАВЛЕННЫЙ - С ЗАВЕРШЕНИЕМ ФАЗЫ)
+-- ФАЙЛ: ut_heart_simple.lua (ИСПРАВЛЕННЫЙ - МЕРЦАНИЕ ПРОПАДАНИЕМ)
 -- РАЗМЕСТИТЕ: addons/gm-tale/lua/autorun/client/
 
 if CLIENT then
@@ -12,7 +12,12 @@ if CLIENT then
     UT_HEART_SIMPLE.player_alive = true
     UT_HEART_SIMPLE.heart_trail = {}
     UT_HEART_SIMPLE.phaseTimer = nil
-    UT_HEART_SIMPLE.phaseDuration = 10  -- 10 секунд на фазу
+    UT_HEART_SIMPLE.phaseDuration = 10
+    
+    -- ====== ПЕРЕМЕННЫЕ ДЛЯ МЕРЦАНИЯ ======
+    UT_HEART_SIMPLE.damageBlinkTimer = 0
+    UT_HEART_SIMPLE.damageBlinkDuration = 0.6  -- Длительность мерцания
+    UT_HEART_SIMPLE.damageBlinkSpeed = 12      -- Скорость мерцания
     
     -- ====== ТАЙМЕР ДЛЯ ЗАВЕРШЕНИЯ ФАЗЫ ======
     function UT_HEART_SIMPLE.StartPhaseTimer()
@@ -57,6 +62,7 @@ if CLIENT then
         UT_HEART_SIMPLE.player_hp = 20
         UT_HEART_SIMPLE.player_alive = true
         UT_HEART_SIMPLE.heart_trail = {}
+        UT_HEART_SIMPLE.damageBlinkTimer = 0
         
         UT_HEART_SIMPLE.heart = {
             x = 0.5,
@@ -90,9 +96,7 @@ if CLIENT then
                 surface.SetDrawColor(255, 255, 255, 80)
                 surface.DrawOutlinedRect(game_left, game_top, game_width, game_height, 2)
                 
-                local heart_material = Material("undertale/hearth.png", "noclamp smooth")
-                local has_heart_sprite = not heart_material:IsError()
-                
+                -- Рисуем снаряды
                 for _, bullet in ipairs(UT_HEART_SIMPLE.bullets) do
                     local bx = game_left + bullet.x * game_width
                     local by = game_top + bullet.y * game_height
@@ -118,32 +122,50 @@ if CLIENT then
                     end
                 end
                 
+                -- ====== РИСУЕМ СЕРДЦЕ С МЕРЦАНИЕМ ======
                 if UT_HEART_SIMPLE.player_alive then
                     local hx = game_left + UT_HEART_SIMPLE.heart.x * game_width
                     local hy = game_top + UT_HEART_SIMPLE.heart.y * game_height
                     
-                    if has_heart_sprite then
-                        surface.SetDrawColor(255, 255, 255, 255)
-                        surface.SetMaterial(heart_material)
-                        local heart_size = UT_HEART_SIMPLE.heart.size * 2
-                        surface.DrawTexturedRect(
-                            hx - heart_size/2, 
-                            hy - heart_size/2, 
-                            heart_size, 
-                            heart_size
-                        )
-                    else
-                        surface.SetDrawColor(255, 0, 0, 255)
-                        draw.NoTexture()
+                    -- Проверяем, нужно ли рисовать сердце (мерцание = пропадание)
+                    local shouldDrawHeart = true
+                    
+                    if UT_HEART_SIMPLE.damageBlinkTimer > 0 and 
+                       CurTime() - UT_HEART_SIMPLE.damageBlinkTimer < UT_HEART_SIMPLE.damageBlinkDuration then
+                        local elapsed = CurTime() - UT_HEART_SIMPLE.damageBlinkTimer
+                        -- Чередуем: рисуем/не рисуем с определенной скоростью
+                        local blinkPhase = math.floor(elapsed * UT_HEART_SIMPLE.damageBlinkSpeed)
+                        shouldDrawHeart = (blinkPhase % 2 == 0)
+                    end
+                    
+                    -- Рисуем сердце только если shouldDrawHeart = true
+                    if shouldDrawHeart then
+                        local heart_material = Material("undertale/hearth.png", "noclamp smooth")
+                        local has_heart_sprite = not heart_material:IsError()
                         
-                        local points = {
-                            {x = hx, y = hy - UT_HEART_SIMPLE.heart.size},
-                            {x = hx + UT_HEART_SIMPLE.heart.size, y = hy},
-                            {x = hx, y = hy + UT_HEART_SIMPLE.heart.size},
-                            {x = hx - UT_HEART_SIMPLE.heart.size, y = hy}
-                        }
-                        
-                        surface.DrawPoly(points)
+                        if has_heart_sprite then
+                            surface.SetDrawColor(255, 255, 255, 255)
+                            surface.SetMaterial(heart_material)
+                            local heart_size = UT_HEART_SIMPLE.heart.size * 2
+                            surface.DrawTexturedRect(
+                                hx - heart_size/2, 
+                                hy - heart_size/2, 
+                                heart_size, 
+                                heart_size
+                            )
+                        else
+                            surface.SetDrawColor(255, 0, 0, 255)
+                            draw.NoTexture()
+                            
+                            local points = {
+                                {x = hx, y = hy - UT_HEART_SIMPLE.heart.size},
+                                {x = hx + UT_HEART_SIMPLE.heart.size, y = hy},
+                                {x = hx, y = hy + UT_HEART_SIMPLE.heart.size},
+                                {x = hx - UT_HEART_SIMPLE.heart.size, y = hy}
+                            }
+                            
+                            surface.DrawPoly(points)
+                        end
                     end
                 end
             end
@@ -161,7 +183,6 @@ if CLIENT then
             end
         end)
         
-        -- ЗАПУСКАЕМ ТАЙМЕР ЗАВЕРШЕНИЯ
         UT_HEART_SIMPLE.StartPhaseTimer()
         
         hook.Add("Think", "UT_SimpleHeart_Think", function()
@@ -262,16 +283,47 @@ if CLIENT then
         end
     end
     
-    -- ====== ПОПАДАНИЕ ======
+    -- ====== ПОПАДАНИЕ (С МЕРЦАНИЕМ) ======
     function UT_HEART_SIMPLE.OnHit()
         if not UT_HEART_SIMPLE.player_alive then return end
         
         UT_HEART_SIMPLE.player_hp = math.max(0, UT_HEART_SIMPLE.player_hp - 2)
         
-        surface.PlaySound("buttons/button15.wav")
+        -- Звук урона
+        if UT_SOUNDS and UT_SOUNDS.PlayDamageTaken then
+            UT_SOUNDS.PlayDamageTaken()
+        else
+            surface.PlaySound("buttons/button15.wav")
+        end
+        
+        -- ЗАПУСКАЕМ МЕРЦАНИЕ (пропадание спрайта)
+        UT_HEART_SIMPLE.damageBlinkTimer = CurTime()
+        
+        -- Добавляем эффект вибрации
+        local originalX = UT_HEART_SIMPLE.heart.x
+        local originalY = UT_HEART_SIMPLE.heart.y
+        
+        local shakeAmount = 0.015
+        UT_HEART_SIMPLE.heart.x = math.Clamp(UT_HEART_SIMPLE.heart.x + (math.random() - 0.5) * shakeAmount, 0.05, 0.95)
+        UT_HEART_SIMPLE.heart.y = math.Clamp(UT_HEART_SIMPLE.heart.y + (math.random() - 0.5) * shakeAmount, 0.05, 0.95)
+        
+        timer.Simple(0.1, function()
+            if UT_HEART_SIMPLE.is_active and UT_HEART_SIMPLE.player_alive then
+                UT_HEART_SIMPLE.heart.x = originalX
+                UT_HEART_SIMPLE.heart.y = originalY
+            end
+        end)
         
         if UT_BATTLE_CORE then
             UT_BATTLE_CORE.playerHp = UT_HEART_SIMPLE.player_hp
+        end
+        
+        -- Отладочное сообщение
+        print("[UNDERTALE] Сердце получило урон! HP: " .. UT_HEART_SIMPLE.player_hp .. "/20")
+        
+        if UT_HEART_SIMPLE.player_hp <= 5 and UT_HEART_SIMPLE.player_hp > 0 then
+            chat.AddText(Color(255, 50, 50), "[КРИТИЧЕСКИЙ УРОВЕНЬ] ", Color(255, 255, 255), 
+                "HP: " .. UT_HEART_SIMPLE.player_hp .. "/20")
         end
         
         if UT_HEART_SIMPLE.player_hp <= 0 then
@@ -307,6 +359,7 @@ if CLIENT then
         print("[UNDERTALE] Остановка простой системы сердца")
         
         UT_HEART_SIMPLE.is_active = false
+        UT_HEART_SIMPLE.damageBlinkTimer = 0
         timer.Remove("UT_SimpleHeart_Bullets")
         timer.Remove("UT_SimpleHeart_PhaseEnd")
         hook.Remove("Think", "UT_SimpleHeart_Think")
@@ -327,5 +380,5 @@ if CLIENT then
         UT_HEART_SIMPLE.Stop()
     end
     
-    print("[UNDERTALE] Простая система сердца загружена (с таймером завершения)")
+    print("[UNDERTALE] Простая система сердца загружена (мерцание пропаданием спрайта)")
 end

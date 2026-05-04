@@ -10,6 +10,7 @@ if CLIENT then
     -- 🎵 СПИСОК МУЗЫКИ
     UT_BATTLE_MUSIC.tracks = {
         default = {
+            "undertale/bring_it_in_guys!.mp3", 
             "undertale/enemy_approaching.mp3",
             "undertale/enemy_retreating.mp3", 
             "undertale/enemy_approaching_classic.mp3"
@@ -90,7 +91,7 @@ if CLIENT then
                     print("[UNDERTALE] ✅ Музыкальный канал создан")
                     
                     -- Настройки (увеличиваем громкость до 5)
-                    chan:SetVolume(5)
+                    chan:SetVolume(0.8)
                     chan:EnableLooping(true)
                     chan:Play()
                     

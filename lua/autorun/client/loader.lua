@@ -18,6 +18,9 @@ include("ut_battle_attacks.lua")
 AddCSLuaFile("ut_init_fix.lua")
 include("ut_init_fix.lua")
 
+AddCSLuaFile("ut_sounds.lua")
+include("ut_sounds.lua")
+
 -- 3. Ядро системы (обновленное)
 AddCSLuaFile("ut_battle_core.lua")
 include("ut_battle_core.lua")

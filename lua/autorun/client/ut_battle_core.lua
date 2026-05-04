@@ -338,38 +338,57 @@ if CLIENT then
     end
     
     -- ОБРАБОТКА ПОПАДАНИЯ
-    function UT_HEART_CORE.OnHeartHit()
-        if not UT_HEART_CORE.player.is_alive then return end
-        
-        UT_HEART_CORE.player.hp = math.max(0, UT_HEART_CORE.player.hp - 2)
-        
+function UT_HEART_CORE.OnHeartHit()
+    if not UT_HEART_CORE.player.is_alive then return end
+    
+    UT_HEART_CORE.player.hp = math.max(0, UT_HEART_CORE.player.hp - 2)
+    
+    -- 🚀 НОВЫЙ ЗВУК УРОНА
+    if UT_SOUNDS and UT_SOUNDS.PlayDamageTaken then
+        UT_SOUNDS.PlayDamageTaken()
+    else
         surface.PlaySound("buttons/button15.wav")
-        
-        UT_HEART_CORE.blink_timer = CurTime()
-        
-        if UT_BATTLE_CORE then
-            UT_BATTLE_CORE.playerHp = UT_HEART_CORE.player.hp
-        end
+    end
+    
+    -- 🚀 АКТИВИРУЕМ МИГАНИЕ
+    UT_HEART_CORE.blink_timer = CurTime()
+    
+    -- Вибрация сердца при уроне
+    local shakeAmount = 5
+    UT_HEART_CORE.heart.x = math.Clamp(
+        UT_HEART_CORE.heart.x + (math.random() - 0.5) * shakeAmount,
+        UT_HEART_CORE.panel_bounds.left + UT_HEART_CORE.heart.size,
+        UT_HEART_CORE.panel_bounds.right - UT_HEART_CORE.heart.size
+    )
+    UT_HEART_CORE.heart.y = math.Clamp(
+        UT_HEART_CORE.heart.y + (math.random() - 0.5) * shakeAmount,
+        UT_HEART_CORE.panel_bounds.top + UT_HEART_CORE.heart.size,
+        UT_HEART_CORE.panel_bounds.bottom - UT_HEART_CORE.heart.size
+    )
+    
+    if UT_BATTLE_CORE then
+        UT_BATTLE_CORE.playerHp = UT_HEART_CORE.player.hp
+    end
+    
+    if UT_BATTLE_HUD and UT_BATTLE_HUD.AddHeartMessage then
+        UT_BATTLE_HUD.AddHeartMessage("* Вы получили урон! HP: "..UT_HEART_CORE.player.hp.."/20")
+    end
+    
+    if UT_HEART_CORE.player.hp <= 0 then
+        UT_HEART_CORE.player.is_alive = false
         
         if UT_BATTLE_HUD and UT_BATTLE_HUD.AddHeartMessage then
-            UT_BATTLE_HUD.AddHeartMessage("* Вы получили урон! HP: "..UT_HEART_CORE.player.hp.."/20")
+            UT_BATTLE_HUD.AddHeartMessage("* Вы были побеждены...")
         end
         
-        if UT_HEART_CORE.player.hp <= 0 then
-            UT_HEART_CORE.player.is_alive = false
-            
-            if UT_BATTLE_HUD and UT_BATTLE_HUD.AddHeartMessage then
-                UT_BATTLE_HUD.AddHeartMessage("* Вы были побеждены...")
+        timer.Simple(3, function()
+            UT_HEART_CORE.StopHeartPhase()
+            if UT_BATTLE_CORE then
+                UT_BATTLE_CORE.EndBattle(false)
             end
-            
-            timer.Simple(3, function()
-                UT_HEART_CORE.StopHeartPhase()
-                if UT_BATTLE_CORE then
-                    UT_BATTLE_CORE.EndBattle(false)
-                end
-            end)
-        end
+        end)
     end
+end
     
     -- ОТРИСОВКА
     function UT_HEART_CORE.Draw()
@@ -408,18 +427,21 @@ if CLIENT then
             end
         end
         
-        if UT_HEART_CORE.player.is_alive then
-            local heart_color = UT_HEART_CORE.heart.color
-            
-            if UT_HEART_CORE.blink_timer and CurTime() - UT_HEART_CORE.blink_timer < 0.3 then
-                local blink = math.sin(CurTime() * 20) > 0
-                if blink then
-                    heart_color = Color(255, 255, 255)
-                end
-            end
-            
-            surface.SetDrawColor(heart_color.r, heart_color.g, heart_color.b, 255)
-            draw.NoTexture()
+if UT_HEART_CORE.player.is_alive then
+    local heart_color = UT_HEART_CORE.heart.color
+    
+    -- Мигание при получении урона
+    if UT_HEART_CORE.blink_timer and CurTime() - UT_HEART_CORE.blink_timer < 0.5 then
+        local blink = math.sin(CurTime() * 20) > 0
+        if blink then
+            heart_color = Color(0, 0, 0, 100)  -- Белый при мигании
+        else
+            heart_color = Color(255, 100, 100, 255)  -- Светло-красный
+        end
+    end
+    
+    surface.SetDrawColor(heart_color.r, heart_color.g, heart_color.b, 255)
+    draw.NoTexture()
             
             local points = {
                 {x = UT_HEART_CORE.heart.x, y = UT_HEART_CORE.heart.y - UT_HEART_CORE.heart.size},
