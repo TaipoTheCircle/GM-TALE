@@ -1,6 +1,6 @@
--- ФАЙЛ: ut_battle_hud.lua (УПРОЩЕННАЯ ВЕРСИЯ БЕЗ СЕТКИ)
+-- ФАЙЛ: ut_battle_hud.lua (С АНИМАЦИЕЙ ВРАГОВ)
 if CLIENT then
-    print("[UNDERTALE] Загрузка модуля интерфейса БЕЗ СЕТКИ...")
+    print("[UNDERTALE] Загрузка модуля интерфейса с анимацией врагов...")
     
     -- Проверяем что ядро загружено
     if not UT_BATTLE_CORE then
@@ -28,11 +28,66 @@ if CLIENT then
     UT_BATTLE_HUD.heartActive = false
     UT_BATTLE_HUD.currentMessage = ""
     
+    -- ====== НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ АНИМАЦИИ ВРАГОВ ======
+    UT_BATTLE_HUD.enemyAnimations = {}  -- Хранит данные анимации для каждого врага
+    
+    -- Функция инициализации анимации для врага
+    UT_BATTLE_HUD.InitEnemyAnimation = function(enemy)
+        if not enemy or not enemy.class then return end
+        
+        local enemyId = tostring(enemy.entity or enemy.class)
+        if not UT_BATTLE_HUD.enemyAnimations[enemyId] then
+            UT_BATTLE_HUD.enemyAnimations[enemyId] = {
+                idleScale = 1.0,
+                idleDirection = 1,  -- 1 = увеличивается, -1 = уменьшается
+                idleSpeed = 0.8,    -- Скорость дыхания
+                lastUpdate = CurTime(),
+                deathAnimProgress = 0,  -- 0 = жив, 1 = полностью исчез
+                isDying = false
+            }
+        end
+        return UT_BATTLE_HUD.enemyAnimations[enemyId]
+    end
+    
+    -- Функция обновления анимации врага (дыхание/пульсация)
+    UT_BATTLE_HUD.UpdateEnemyAnimation = function(enemy, animData)
+        if not enemy or not animData then return end
+        
+        local dt = FrameTime()
+        
+        if enemy.hp > 0 then
+            -- Живой враг - эффект дыхания (растягивание)
+            if not animData.isDying then
+                animData.idleScale = animData.idleScale + (animData.idleDirection * animData.idleSpeed * dt)
+                
+                if animData.idleScale >= 1.08 then
+                    animData.idleScale = 1.08
+                    animData.idleDirection = -1
+                elseif animData.idleScale <= 0.92 then
+                    animData.idleScale = 0.92
+                    animData.idleDirection = 1
+                end
+            end
+        else
+            -- Мертвый враг - анимация исчезновения
+            if not animData.isDying then
+                animData.isDying = true
+                animData.deathAnimProgress = 0
+            end
+            
+            if animData.isDying and animData.deathAnimProgress < 1 then
+                animData.deathAnimProgress = math.min(1, animData.deathAnimProgress + dt * 2)  -- Исчезает за 0.5 сек
+            end
+        end
+        
+        return animData
+    end
+    
     -- КЭШ МАТЕРИАЛОВ
     UT_BATTLE_HUD.enemyMaterialCache = {}
     UT_BATTLE_HUD.gridMaterial = nil
     
-    -- СОЗДАНИЕ ШРИФТОВ (только основные)
+    -- СОЗДАНИЕ ШРИФТОВ
     surface.CreateFont("UT_Menu", {
         font = "Arial",
         size = 24,
@@ -57,14 +112,14 @@ if CLIENT then
     surface.CreateFont("UT_Attack", {
         font = "Arial",
         size = 36,
-        weight = 900,  -- Очень жирный
+        weight = 900,
         antialias = true
     })
     
     surface.CreateFont("UT_EnemyName", {
         font = "Arial",
-        size = 28,  -- Увеличили
-        weight = 900,  -- Очень жирный
+        size = 28,
+        weight = 900,
         antialias = true
     })
     
@@ -101,8 +156,12 @@ if CLIENT then
         return UT_BATTLE_HUD.gridMaterial
     end
     
-    -- 🔴 ВАЖНО: НОВАЯ ФУНКЦИЯ ДЛЯ БОЛЬШОГО ВРАГА
+    -- ====== НОВАЯ ФУНКЦИЯ ДЛЯ ЖИВОГО ВРАГА (С АНИМАЦИЕЙ) ======
     UT_BATTLE_HUD.DrawLargeEnemy = function(enemy, x, y, w, h)
+        -- Инициализируем анимацию для врага
+        local animData = UT_BATTLE_HUD.InitEnemyAnimation(enemy)
+        animData = UT_BATTLE_HUD.UpdateEnemyAnimation(enemy, animData)
+        
         -- Определяем выбран ли враг
         local isSelected = false
         if UT_BATTLE_CORE.selectedTarget and UT_BATTLE_CORE.currentTargets then
@@ -110,11 +169,25 @@ if CLIENT then
             isSelected = selectedEnemy == enemy
         end
         
-        -- Большой спрайт врага
-        local spriteW = w * 0.9
-        local spriteH = h * 0.85
+        -- Применяем масштаб анимации (растягивание)
+        local scaleX = animData.idleScale
+        local scaleY = 1 + (1 - animData.idleScale) * 0.5  -- Растягиваем больше по вертикали
+        
+        -- Размеры спрайта с учётом анимации
+        local baseW = w * 0.9
+        local baseH = h * 0.85
+        local spriteW = baseW * scaleX
+        local spriteH = baseH * scaleY
         local spriteX = x + (w - spriteW) / 2
         local spriteY = y + (h - spriteH) / 2
+        
+        -- Маленькая вибрация если враг выбран
+        local shakeX = 0
+        local shakeY = 0
+        if isSelected then
+            shakeX = math.sin(CurTime() * 20) * 2
+            shakeY = math.cos(CurTime() * 18) * 1
+        end
         
         -- Спрайт врага
         local material = UT_BATTLE_HUD.GetEnemyMaterial(enemy.class or "npc_zombie")
@@ -123,199 +196,179 @@ if CLIENT then
             -- Толстая черная обводка
             surface.SetDrawColor(0, 0, 0, 220)
             for i = 1, 5 do
-                surface.DrawOutlinedRect(spriteX - i, spriteY - i, spriteW + i*2, spriteH + i*2, 1)
+                surface.DrawOutlinedRect(spriteX - i + shakeX, spriteY - i + shakeY, 
+                    spriteW + i*2, spriteH + i*2, 1)
             end
             
             -- Сам спрайт
             surface.SetDrawColor(255, 255, 255, 255)
             surface.SetMaterial(material)
-            surface.DrawTexturedRect(spriteX, spriteY, spriteW, spriteH)
+            surface.DrawTexturedRect(spriteX + shakeX, spriteY + shakeY, spriteW, spriteH)
             
             -- Желтая обводка для выбранного
             if isSelected then
                 surface.SetDrawColor(255, 255, 0, 220)
-                for i = 1, 8 do
-                    surface.DrawOutlinedRect(spriteX - i - 5, spriteY - i - 5, 
-                        spriteW + (i+5)*2, spriteH + (i+5)*2, 1)
+                for i = 1, 6 do
+                    surface.DrawOutlinedRect(spriteX - i - 3 + shakeX, spriteY - i - 3 + shakeY, 
+                        spriteW + (i+3)*2, spriteH + (i+3)*2, 2)
                 end
-                
-                -- Анимация пульсации для выбранного врага
-                local pulse = math.sin(CurTime() * 3) * 0.05 + 0.95
-                surface.SetDrawColor(255, 255, 0, 80)
-                surface.DrawOutlinedRect(
-                    spriteX - 15 * pulse, 
-                    spriteY - 15 * pulse, 
-                    spriteW + 30 * pulse, 
-                    spriteH + 30 * pulse, 
-                    3
-                )
             end
         else
-            -- Запасной вариант: большой цветной прямоугольник
+            -- Запасной вариант
             surface.SetDrawColor(200, 50, 50, 220)
-            surface.DrawRect(spriteX, spriteY, spriteW, spriteH)
+            surface.DrawRect(spriteX + shakeX, spriteY + shakeY, spriteW, spriteH)
             
             surface.SetDrawColor(0, 0, 0, 200)
-            surface.DrawOutlinedRect(spriteX - 3, spriteY - 3, spriteW + 6, spriteH + 6, 5)
+            surface.DrawOutlinedRect(spriteX - 3 + shakeX, spriteY - 3 + shakeY, spriteW + 6, spriteH + 6, 5)
             
-            -- Текст класса
             draw.SimpleTextOutlined(enemy.class or "ENEMY", "UT_EnemyName", 
-                x + w/2, y + h/2, 
+                x + w/2 + shakeX, y + h/2 + shakeY, 
                 Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER,
                 3, Color(0, 0, 0, 200))
         end
         
-        -- ИМЯ ВРАГА ПОД СПРАЙТОМ (БОЛЬШОЙ ТЕКСТ)
-        local nameY = y + h + 10
-        draw.SimpleTextOutlined(enemy.name or "Враг", "UT_EnemyName", 
-            x + w/2, nameY, 
-            Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER,
-            3, Color(0, 0, 0, 200))
-        
-        -- БОЛЬШОЙ HP БАР
-        local hpPercent = math.max(0, enemy.hp / enemy.maxhp)
-        local hpBarW = w * 0.8
-        local hpBarH = 15  -- Толстый!
-        local hpBarX = x + (w - hpBarW) / 2
-        local hpBarY = nameY + 30
-        
-        -- Фон HP бара с толстой обводкой
-        surface.SetDrawColor(50, 50, 50, 200)
-        surface.DrawRect(hpBarX, hpBarY, hpBarW, hpBarH)
-        surface.SetDrawColor(0, 0, 0, 180)
-        surface.DrawOutlinedRect(hpBarX - 2, hpBarY - 2, hpBarW + 4, hpBarH + 4, 3)
-        
-        -- Заполнение HP бара
-        local hpColor
-        if hpPercent > 0.5 then
-            hpColor = Color(0, 255, 0, 255)
-        elseif hpPercent > 0.2 then
-            hpColor = Color(255, 255, 0, 255)
-        else
-            hpColor = Color(255, 50, 0, 255)
-            -- Пульсация при низком HP
-            local pulse = math.sin(CurTime() * 5) * 0.3 + 0.7
-            hpColor = Color(255 * pulse, 50 * pulse, 0, 255)
+        -- ИМЯ ВРАГА (только если жив и не в процессе исчезновения)
+        if enemy.hp > 0 then
+            local nameY = y + h + 10
+            draw.SimpleTextOutlined(enemy.name or "Враг", "UT_EnemyName", 
+                x + w/2, nameY, 
+                Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER,
+                3, Color(0, 0, 0, 200))
+            
+            -- HP БАР (только для живых)
+            local hpPercent = math.max(0, enemy.hp / enemy.maxhp)
+            local hpBarW = w * 0.8
+            local hpBarH = 15
+            local hpBarX = x + (w - hpBarW) / 2
+            local hpBarY = nameY + 30
+            
+            -- Фон HP бара
+            surface.SetDrawColor(50, 50, 50, 200)
+            surface.DrawRect(hpBarX, hpBarY, hpBarW, hpBarH)
+            surface.SetDrawColor(0, 0, 0, 180)
+            surface.DrawOutlinedRect(hpBarX - 2, hpBarY - 2, hpBarW + 4, hpBarH + 4, 3)
+            
+            -- Заполнение HP бара
+            local hpColor
+            if hpPercent > 0.5 then
+                hpColor = Color(0, 255, 0, 255)
+            elseif hpPercent > 0.2 then
+                hpColor = Color(255, 255, 0, 255)
+            else
+                hpColor = Color(255, 50, 0, 255)
+                local pulse = math.sin(CurTime() * 5) * 0.3 + 0.7
+                hpColor = Color(255 * pulse, 50 * pulse, 0, 255)
+            end
+            
+            surface.SetDrawColor(hpColor.r, hpColor.g, hpColor.b, 255)
+            surface.DrawRect(hpBarX, hpBarY, hpBarW * hpPercent, hpBarH)
+            
+            -- Текст HP
+            draw.SimpleTextOutlined(math.ceil(enemy.hp) .. "/" .. enemy.maxhp, "UT_EnemyName", 
+                x + w/2, hpBarY - 20, 
+                Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER,
+                2, Color(0, 0, 0, 200))
         end
-        
-        surface.SetDrawColor(hpColor.r, hpColor.g, hpColor.b, 255)
-        surface.DrawRect(hpBarX, hpBarY, hpBarW * hpPercent, hpBarH)
-        
-        -- Текст HP (БОЛЬШОЙ)
-        draw.SimpleTextOutlined(math.ceil(enemy.hp) .. "/" .. enemy.maxhp, "UT_EnemyName", 
-            x + w/2, hpBarY - 20, 
-            Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER,
-            2, Color(0, 0, 0, 200))
     end
     
-    -- 🔴 ВАЖНО: НОВАЯ ФУНКЦИЯ ДЛЯ БОЛЬШОГО МЕРТВОГО ВРАГА
-    UT_BATTLE_HUD.DrawLargeDeadEnemy = function(enemy, x, y, w, h)
-        -- Полупрозрачный серый спрайт
-        local spriteW = w * 0.8
-        local spriteH = h * 0.75
+    -- ====== НОВАЯ ФУНКЦИЯ ДЛЯ МЕРТВОГО ВРАГА (БЕЗ КРАСНЫХ ПОЛОС И НАДПИСИ) ======
+    UT_BATTLE_HUD.DrawDeadEnemy = function(enemy, x, y, w, h)
+        -- Инициализируем анимацию
+        local animData = UT_BATTLE_HUD.InitEnemyAnimation(enemy)
+        animData = UT_BATTLE_HUD.UpdateEnemyAnimation(enemy, animData)
+        
+        -- Полупрозрачность в зависимости от прогресса исчезновения
+        local alpha = 255 * (1 - animData.deathAnimProgress)
+        
+        if alpha <= 0 then
+            return  -- Полностью исчез, не рисуем
+        end
+        
+        -- Размеры с уменьшением при исчезновении
+        local scale = 1 - animData.deathAnimProgress * 0.5  -- Уменьшается до 50%
+        local spriteW = w * 0.8 * scale
+        local spriteH = h * 0.75 * scale
         local spriteX = x + (w - spriteW) / 2
         local spriteY = y + (h - spriteH) / 2
         
-        -- Серый спрайт врага
+        -- Серый спрайт врага с прозрачностью
         local material = UT_BATTLE_HUD.GetEnemyMaterial(enemy.class or "npc_zombie")
         if material then
-            surface.SetDrawColor(100, 100, 100, 150)
+            surface.SetDrawColor(100, 100, 100, alpha * 0.7)
             surface.SetMaterial(material)
             surface.DrawTexturedRect(spriteX, spriteY, spriteW, spriteH)
         end
         
-        -- БОЛЬШОЙ КРАСНЫЙ КРЕСТ (толстый)
-        surface.SetDrawColor(200, 0, 0, 200)
-        local crossThickness = 8
-        
-        -- Вертикальная линия креста
-        surface.DrawRect(x + w/2 - crossThickness/2, y, crossThickness, h)
-        -- Горизонтальная линия креста
-        surface.DrawRect(x, y + h/2 - crossThickness/2, w, crossThickness)
-        
-        -- Диагональные кресты (X)
-        for i = 1, 5 do
-            surface.DrawLine(x + i, y + i, x + w - i, y + h - i)
-            surface.DrawLine(x + w - i, y + i, x + i, y + h - i)
-        end
-        
-        -- Текст "МЕРТВ" (БОЛЬШОЙ)
-        draw.SimpleTextOutlined("✝ МЕРТВ", "UT_Attack", 
-            x + w/2, y + h + 20, 
-            Color(200, 50, 50, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER,
-            3, Color(0, 0, 0, 200))
+        -- ❌ НЕТ КРАСНЫХ КРЕСТОВ И НАДПИСИ "МЕРТВ"
+        -- Просто серый исчезающий спрайт
     end
     
-    -- 🔴 ВАЖНО: УПРОЩЕННАЯ ФУНКЦИЯ ОТРИСОВКИ ВРАГОВ НА GRID
+    -- ====== ФУНКЦИЯ ОТРИСОВКИ ВРАГОВ ======
     UT_BATTLE_HUD.DrawEnemiesOnGrid = function()
         if not UT_BATTLE_CORE.currentTargets or #UT_BATTLE_CORE.currentTargets == 0 then 
             return 
         end
         
-        -- Размеры PNG фона (609x236) - это просто фон!
+        -- Размеры PNG фона
         local gridW = 1609
         local gridH = 580
         local gridX = ScrW()/2 - gridW/2
         local gridY = ScrH() * 0.03
         
-        -- Рисуем PNG фон (ПРОСТО ДЛЯ КРАСОТЫ)
+        -- Рисуем PNG фон
         local gridMaterial = UT_BATTLE_HUD.GetGridMaterial()
         if gridMaterial then
-            surface.SetDrawColor(255, 255, 255, 180)  -- Полупрозрачный
+            surface.SetDrawColor(255, 255, 255, 180)
             surface.SetMaterial(gridMaterial)
             surface.DrawTexturedRect(gridX, gridY, gridW, gridH)
         end
         
-        -- 🔴🔴🔴 ВРАГИ РИСУЮТСЯ ПОВЕРХ GRID И ЗАНИМАЮТ 2-3 ЯЧЕЙКИ 🔴🔴🔴
+        -- Отрисовка врагов
         local enemies = UT_BATTLE_CORE.currentTargets
         local enemyCount = #enemies
         
         if enemyCount == 1 then
-            -- Один враг - ОГРОМНЫЙ по центру
             local enemy = enemies[1]
-            local enemyWidth = 500  -- Очень широкий
-            local enemyHeight = 400 -- Очень высокий
-            local enemyX = ScrW()/2 - enemyWidth/2  -- Центр экрана, а не grid!
-            local enemyY = gridY + gridH/2 - enemyHeight/2  -- Центр по вертикали grid
+            local enemyWidth = 500
+            local enemyHeight = 400
+            local enemyX = ScrW()/2 - enemyWidth/2
+            local enemyY = gridY + gridH/2 - enemyHeight/2
             
-            -- Рисуем на 50px ВЫШЕ grid чтобы перекрывать
             if enemy.hp > 0 then
                 UT_BATTLE_HUD.DrawLargeEnemy(enemy, enemyX, enemyY - 50, enemyWidth, enemyHeight)
             else
-                UT_BATTLE_HUD.DrawLargeDeadEnemy(enemy, enemyX, enemyY - 50, enemyWidth, enemyHeight)
+                UT_BATTLE_HUD.DrawDeadEnemy(enemy, enemyX, enemyY - 50, enemyWidth, enemyHeight)
             end
             
         elseif enemyCount == 2 then
-            -- Два врага: левый и правый (БОЛЬШИЕ)
             local enemyWidth = 450
             local enemyHeight = 380
-            local spacing = 200  -- Расстояние между врагами
+            local spacing = 200
             
             for i, enemy in ipairs(enemies) do
                 local enemyX
                 if i == 1 then
-                    enemyX = ScrW()/2 - enemyWidth - spacing/2  -- Левый
+                    enemyX = ScrW()/2 - enemyWidth - spacing/2
                 else
-                    enemyX = ScrW()/2 + spacing/2  -- Правый
+                    enemyX = ScrW()/2 + spacing/2
                 end
                 local enemyY = gridY + gridH/2 - enemyHeight/2 - 40
                 
                 if enemy.hp > 0 then
                     UT_BATTLE_HUD.DrawLargeEnemy(enemy, enemyX, enemyY, enemyWidth, enemyHeight)
                 else
-                    UT_BATTLE_HUD.DrawLargeDeadEnemy(enemy, enemyX, enemyY, enemyWidth, enemyHeight)
+                    UT_BATTLE_HUD.DrawDeadEnemy(enemy, enemyX, enemyY, enemyWidth, enemyHeight)
                 end
             end
             
         elseif enemyCount == 3 then
-            -- Три врага: треугольник (БОЛЬШИЕ)
             local enemyWidth = 400
             local enemyHeight = 350
             
             local positions = {
-                {x = ScrW()/2 - enemyWidth/2, y = gridY + 50},  -- Верхний центр
-                {x = ScrW()/2 - enemyWidth - 100, y = gridY + gridH - enemyHeight - 50},  -- Левый низ
-                {x = ScrW()/2 + 100, y = gridY + gridH - enemyHeight - 50}  -- Правый низ
+                {x = ScrW()/2 - enemyWidth/2, y = gridY + 50},
+                {x = ScrW()/2 - enemyWidth - 100, y = gridY + gridH - enemyHeight - 50},
+                {x = ScrW()/2 + 100, y = gridY + gridH - enemyHeight - 50}
             }
             
             for i, enemy in ipairs(enemies) do
@@ -323,13 +376,12 @@ if CLIENT then
                     if enemy.hp > 0 then
                         UT_BATTLE_HUD.DrawLargeEnemy(enemy, positions[i].x, positions[i].y, enemyWidth, enemyHeight)
                     else
-                        UT_BATTLE_HUD.DrawLargeDeadEnemy(enemy, positions[i].x, positions[i].y, enemyWidth, enemyHeight)
+                        UT_BATTLE_HUD.DrawDeadEnemy(enemy, positions[i].x, positions[i].y, enemyWidth, enemyHeight)
                     end
                 end
             end
             
         else
-            -- Много врагов - в линию (БОЛЬШИЕ)
             local enemyWidth = 220
             local enemyHeight = 270
             local totalWidth = enemyWidth * enemyCount + 100 * (enemyCount - 1)
@@ -342,48 +394,39 @@ if CLIENT then
                 if enemy.hp > 0 then
                     UT_BATTLE_HUD.DrawLargeEnemy(enemy, enemyX, enemyY, enemyWidth, enemyHeight)
                 else
-                    UT_BATTLE_HUD.DrawLargeDeadEnemy(enemy, enemyX, enemyY, enemyWidth, enemyHeight)
+                    UT_BATTLE_HUD.DrawDeadEnemy(enemy, enemyX, enemyY, enemyWidth, enemyHeight)
                 end
             end
         end
         
-        -- В конце DrawEnemiesOnGrid добавляем стрелку выбора:
+        -- Стрелка выбора
         if UT_BATTLE_CORE.battleMode == "FIGHT" and UT_BATTLE_CORE.selectedTarget then
             local selectedEnemy = UT_BATTLE_CORE.currentTargets[UT_BATTLE_CORE.selectedTarget]
             if selectedEnemy and selectedEnemy.hp > 0 then
-                -- Находим позицию выбранного врага
-                local enemyIndex = UT_BATTLE_CORE.selectedTarget
-                local enemyCount = #UT_BATTLE_CORE.currentTargets
-                
-                -- БОЛЬШАЯ ЖЕЛТАЯ СТРЕЛКА СПРАВА ОТ ВРАГА
                 local arrowX, arrowY, arrowSize
                 
                 if enemyCount == 1 then
-                    arrowX = ScrW()/2 + 300  -- Справа от центрального врага
+                    arrowX = ScrW()/2 + 300
                     arrowY = ScrH() * 0.25 + 100
                     arrowSize = 40
                 elseif enemyCount == 2 then
-                    arrowX = (enemyIndex == 1) and (ScrW()/2 - 550) or (ScrW()/2 + 550)
+                    local targetIndex = UT_BATTLE_CORE.selectedTarget
+                    arrowX = (targetIndex == 1) and (ScrW()/2 - 550) or (ScrW()/2 + 550)
                     arrowY = ScrH() * 0.25 + 100
                     arrowSize = 35
                 else
-                    -- Для остальных случаев
                     arrowX = ScrW()/2 + 400
                     arrowY = ScrH() * 0.25 + 100
                     arrowSize = 30
                 end
                 
-                -- Рисуем ОГРОМНУЮ стрелку
                 surface.SetDrawColor(255, 255, 0, 255)
-                
-                -- Треугольная стрелка
                 surface.DrawPoly({
                     {x = arrowX, y = arrowY - arrowSize},
                     {x = arrowX + arrowSize, y = arrowY},
                     {x = arrowX, y = arrowY + arrowSize}
                 })
                 
-                -- Обводка стрелки
                 surface.SetDrawColor(0, 0, 0, 200)
                 surface.DrawPoly({
                     {x = arrowX - 2, y = arrowY - arrowSize - 2},
@@ -391,14 +434,17 @@ if CLIENT then
                     {x = arrowX - 2, y = arrowY + arrowSize + 2}
                 })
                 
-                -- Текст "ВЫБРАН"
                 draw.SimpleTextOutlined("► ВЫБРАН", "UT_Attack", 
                     arrowX + arrowSize + 20, arrowY, 
                     Color(255, 255, 0), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER,
                     3, Color(0, 0, 0, 200))
             end
         end
-    end
+
+    
+
+    print("[UNDERTALE] Модуль интерфейса с анимацией врагов загружен")
+end
     
     -- ДОБАВЛЕНИЕ СООБЩЕНИЯ В ДИАЛОГ
     UT_BATTLE_HUD.AddHeartMessage = function(message)
