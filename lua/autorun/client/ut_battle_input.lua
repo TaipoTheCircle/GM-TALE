@@ -32,6 +32,11 @@ if CLIENT then
         if UT_BATTLE_CORE.keyCooldown > currentTime then return false end
         UT_BATTLE_CORE.keyCooldown = currentTime + 0.15
         
+        -- Не обрабатываем навигацию во время фазы сердца и атаки
+        if UT_BATTLE_CORE.battleMode == "HEART_PHASE" or UT_BATTLE_CORE.battleMode == "ATTACK" then
+            return false
+        end
+        
         if UT_BATTLE_CORE.battleMode == "MENU" then
             if key == KEY_LEFT then
                 UT_BATTLE_CORE.selectedButton = UT_BATTLE_CORE.selectedButton - 1
@@ -76,6 +81,65 @@ if CLIENT then
                     if newTarget > #UT_BATTLE_CORE.currentTargets then newTarget = 1 end
                 end
             end
+            
+        elseif UT_BATTLE_CORE.battleMode == "ACT_TARGET" then
+            if key == KEY_UP then
+                local newTarget = UT_BATTLE_CORE.selectedTarget - 1
+                if newTarget < 1 then newTarget = #UT_BATTLE_CORE.currentTargets end
+                
+                for i = 1, #UT_BATTLE_CORE.currentTargets do
+                    local enemy = UT_BATTLE_CORE.currentTargets[newTarget]
+                    if enemy and enemy.hp > 0 then
+                        UT_BATTLE_CORE.selectedTarget = newTarget
+                        if UT_BATTLE_HUD and UT_BATTLE_HUD.UpdateDialogPanel then
+                            UT_BATTLE_HUD.UpdateDialogPanel()
+                        end
+                        return true
+                    end
+                    newTarget = newTarget - 1
+                    if newTarget < 1 then newTarget = #UT_BATTLE_CORE.currentTargets end
+                end
+                
+            elseif key == KEY_DOWN then
+                local newTarget = UT_BATTLE_CORE.selectedTarget + 1
+                if newTarget > #UT_BATTLE_CORE.currentTargets then newTarget = 1 end
+                
+                for i = 1, #UT_BATTLE_CORE.currentTargets do
+                    local enemy = UT_BATTLE_CORE.currentTargets[newTarget]
+                    if enemy and enemy.hp > 0 then
+                        UT_BATTLE_CORE.selectedTarget = newTarget
+                        if UT_BATTLE_HUD and UT_BATTLE_HUD.UpdateDialogPanel then
+                            UT_BATTLE_HUD.UpdateDialogPanel()
+                        end
+                        return true
+                    end
+                    newTarget = newTarget + 1
+                    if newTarget > #UT_BATTLE_CORE.currentTargets then newTarget = 1 end
+                end
+            end
+            
+        elseif UT_BATTLE_CORE.battleMode == "ACT" then
+            if key == KEY_UP then
+                UT_BATTLE_CORE.selectedAct = math.max(1, (UT_BATTLE_CORE.selectedAct or 1) - 1)
+                if UT_BATTLE_HUD and UT_BATTLE_HUD.UpdateDialogPanel then
+                    UT_BATTLE_HUD.UpdateDialogPanel()
+                end
+                return true
+            elseif key == KEY_DOWN then
+                local target = UT_BATTLE_CORE.currentTargets and UT_BATTLE_CORE.currentTargets[UT_BATTLE_CORE.selectedTarget]
+                local max_acts = 3
+                if target and target.class and UT_ENEMY_DATA then
+                    local enemy_data = UT_ENEMY_DATA.Get(target.class)
+                    if enemy_data and enemy_data.acts then
+                        max_acts = #enemy_data.acts
+                    end
+                end
+                UT_BATTLE_CORE.selectedAct = math.min(max_acts, (UT_BATTLE_CORE.selectedAct or 1) + 1)
+                if UT_BATTLE_HUD and UT_BATTLE_HUD.UpdateDialogPanel then
+                    UT_BATTLE_HUD.UpdateDialogPanel()
+                end
+                return true
+            end
         end
         
         return false
@@ -116,7 +180,6 @@ if CLIENT then
         UT_BATTLE_CORE.attackBarSpeed = settings.barSpeed
         UT_BATTLE_CORE.attackResult = nil
         
-        -- Зона попадания (невидимая, используется только для расчета)
         local zoneStart = (settings.panelWidth - settings.zoneWidth) / 2
         local zoneFinish = zoneStart + settings.zoneWidth
         
@@ -131,12 +194,11 @@ if CLIENT then
         
         UT_BATTLE_INPUT.UpdateAttackPanelPaint()
         
-        -- Только одно короткое сообщение в чат
         chat.AddText(Color(255, 255, 0), "[АТАКА] ", Color(255, 255, 255), 
             "Нажмите ПРОБЕЛ!")
     end
     
-    -- ОТРИСОВКА ПАНЕЛИ АТАКИ (чистый Undertale стиль)
+    -- ОТРИСОВКА ПАНЕЛИ АТАКИ
     UT_BATTLE_INPUT.UpdateAttackPanelPaint = function()
         if not IsValid(UT_BATTLE_CORE.dialogPanel) then return end
         
@@ -145,20 +207,16 @@ if CLIENT then
         local hasSniperTexture = sniperMaterial and not sniperMaterial:IsError()
         
         UT_BATTLE_CORE.dialogPanel.Paint = function(self, w, h)
-            -- ФОН с текстурой
             if hasSniperTexture then
                 surface.SetDrawColor(255, 255, 255, 255)
                 surface.SetMaterial(sniperMaterial)
                 surface.DrawTexturedRect(0, 0, w, h)
             else
-                -- Черный фон если текстуры нет
                 surface.SetDrawColor(0, 0, 0, 230)
                 surface.DrawRect(0, 0, w, h)
             end
             
-            -- ТОЛЬКО ДВИЖУЩАЯСЯ ПОЛОСКА (никаких зон, никаких надписей)
             if UT_BATTLE_CORE.attackActive then
-                -- Белая полоска
                 surface.SetDrawColor(255, 255, 255, 255)
                 surface.DrawRect(
                     UT_BATTLE_CORE.attackBarPos, 
@@ -167,7 +225,6 @@ if CLIENT then
                     24
                 )
                 
-                -- Красная линия посередине полоски
                 surface.SetDrawColor(255, 0, 0, 255)
                 surface.DrawLine(
                     UT_BATTLE_CORE.attackBarPos + settings.barWidth/2, 
@@ -177,7 +234,6 @@ if CLIENT then
                 )
             end
             
-            -- РЕЗУЛЬТАТ АТАКИ (только текст результата, без лишних подсказок)
             if UT_BATTLE_CORE.attackResult then
                 local resultText = ""
                 local resultColor = Color(255, 255, 255)
@@ -222,7 +278,6 @@ if CLIENT then
         local damage = settings.minDamage
         local resultType = "hit"
         
-        -- Проверяем попадание в зону (невидимую)
         if barCenter >= zone.start and barCenter <= zone.finish then
             local distanceFromCenter = math.abs(barCenter - zone.center) / (zone.width / 2)
             distanceFromCenter = math.Clamp(distanceFromCenter, 0, 1)
@@ -235,7 +290,6 @@ if CLIENT then
         UT_BATTLE_CORE.attackDamage = damage
         UT_BATTLE_CORE.attackResult = resultType
         
-        -- Звуки
         if resultType == "perfect" then
             UT_BATTLE_CORE.PlaySoundSafe("undertale-critical.mp3")
             chat.AddText(Color(255, 255, 0), "[АТАКА] ", Color(255, 255, 255), 
@@ -246,7 +300,6 @@ if CLIENT then
                 "Попадание! " .. damage .. " урона!")
         end
         
-        -- Нанесение урона
         if UT_BATTLE_CORE.currentTargets and UT_BATTLE_CORE.currentTargets[UT_BATTLE_CORE.selectedTarget] then
             local target = UT_BATTLE_CORE.currentTargets[UT_BATTLE_CORE.selectedTarget]
             target.hp = math.max(0, target.hp - damage)
@@ -369,14 +422,9 @@ if CLIENT then
     
     -- ОБРАБОТКА НАЖАТИЙ КЛАВИШ МЕНЮ
     UT_BATTLE_INPUT.HandleKeyPress = function(key)
-        if UT_BATTLE_INPUT.waitingForAttackInput then return false end
-        
-        if key == KEY_ESCAPE then
-            if UT_BATTLE_CORE.battleMode == "MENU" then
-                UT_BATTLE_CORE.StopAllSystems()
-                UT_BATTLE_CORE.PlaySoundSafe("undertale-select-sound.mp3")
-                return true
-            elseif UT_BATTLE_CORE.battleMode == "HEART_PHASE" then
+        -- В режиме HEART_PHASE не обрабатываем клавиши меню (кроме ESC)
+        if UT_BATTLE_CORE.battleMode == "HEART_PHASE" then
+            if key == KEY_ESCAPE then
                 UT_BATTLE_CORE.battleMode = "MENU"
                 if UT_HEART_CORE and UT_HEART_CORE.StopHeartPhase then
                     UT_HEART_CORE.StopHeartPhase()
@@ -384,6 +432,17 @@ if CLIENT then
                 if UT_HEART_SIMPLE and UT_HEART_SIMPLE.Stop then
                     UT_HEART_SIMPLE.Stop()
                 end
+                UT_BATTLE_CORE.PlaySoundSafe("undertale-select-sound.mp3")
+                return true
+            end
+            return false
+        end
+        
+        if UT_BATTLE_INPUT.waitingForAttackInput then return false end
+        
+        if key == KEY_ESCAPE then
+            if UT_BATTLE_CORE.battleMode == "MENU" then
+                UT_BATTLE_CORE.StopAllSystems()
                 UT_BATTLE_CORE.PlaySoundSafe("undertale-select-sound.mp3")
                 return true
             else
@@ -411,50 +470,64 @@ if CLIENT then
                 local action = UT_BATTLE_CORE.buttons[UT_BATTLE_CORE.selectedButton].name
                 
                 if action == "FIGHT" then
-                    UT_BATTLE_CORE.battleMode = "FIGHT"
-                    UT_BATTLE_CORE.selectedTarget = 1
-                    
-                    for i, enemy in ipairs(UT_BATTLE_CORE.currentTargets) do
-                        if enemy.hp > 0 then
-                            UT_BATTLE_CORE.selectedTarget = i
-                            break
+                    if UT_BATTLE_ACTION and UT_BATTLE_ACTION.StartFight then
+                        UT_BATTLE_ACTION.StartFight()
+                        UT_BATTLE_CORE.PlaySoundSafe("undertale-select-sound.mp3")
+                    else
+                        UT_BATTLE_CORE.battleMode = "FIGHT"
+                        UT_BATTLE_CORE.selectedTarget = 1
+                        
+                        for i, enemy in ipairs(UT_BATTLE_CORE.currentTargets) do
+                            if enemy.hp > 0 then
+                                UT_BATTLE_CORE.selectedTarget = i
+                                break
+                            end
                         end
+                        
+                        if UT_BATTLE_CORE.UpdateButtonImages then
+                            UT_BATTLE_CORE.UpdateButtonImages()
+                        end
+                        UT_BATTLE_CORE.PlaySoundSafe("undertale-select-sound.mp3")
+                        
+                        if UT_BATTLE_HUD and UT_BATTLE_HUD.UpdateDialogPanel then
+                            UT_BATTLE_HUD.UpdateDialogPanel()
+                        end
+                        
+                        chat.AddText(Color(255, 200, 0), "[БОЙ] ", Color(255, 255, 255), 
+                            "Выберите цель (↑ ↓)")
                     end
                     
-                    if UT_BATTLE_CORE.UpdateButtonImages then
-                        UT_BATTLE_CORE.UpdateButtonImages()
-                    end
-                    UT_BATTLE_CORE.PlaySoundSafe("undertale-select-sound.mp3")
-                    
+                elseif action == "ACT" then
+                    UT_BATTLE_CORE.battleMode = "ACT_TARGET"
+                    UT_BATTLE_CORE.selectedTarget = 1
                     if UT_BATTLE_HUD and UT_BATTLE_HUD.UpdateDialogPanel then
                         UT_BATTLE_HUD.UpdateDialogPanel()
                     end
-                    
-                    chat.AddText(Color(255, 200, 0), "[БОЙ] ", Color(255, 255, 255), 
-                        "Выберите цель (↑ ↓)")
-                    
-                elseif action == "ACT" then
-                    UT_BATTLE_CORE.battleMode = "ACT"
-                    UT_BATTLE_CORE.selectedTarget = 1
-                    if UT_BATTLE_CORE.UpdateButtonImages then
-                        UT_BATTLE_CORE.UpdateButtonImages()
-                    end
                     UT_BATTLE_CORE.PlaySoundSafe("undertale-select-sound.mp3")
+                    chat.AddText(Color(200, 200, 255), "[ACT] ", Color(255, 255, 255), 
+                        "Выберите цель (↑ ↓), затем ENTER")
                     
                 elseif action == "ITEM" then
                     UT_BATTLE_CORE.PlaySoundSafe("undertale-select-sound.mp3")
-                    chat.AddText(Color(255, 255, 0), "[UNDERTALE] ", Color(255, 255, 255), "Нет предметов!")
+                    chat.AddText(Color(255, 255, 0), "[UNDERTALE] ", Color(255, 255, 255), 
+                        "Нет предметов!")
                     
                 elseif action == "MERCY" then
-                    UT_BATTLE_CORE.PlaySoundSafe("undertale-select-sound.mp3")
-                    chat.AddText(Color(255, 255, 0), "[UNDERTALE] ", Color(255, 255, 255), "Пощада!")
-                    
-                    timer.Simple(2, function()
-                        if IsValid(UT_BATTLE_CORE.battleFrame) then
-                            chat.AddText(Color(0, 255, 0), "[UNDERTALE] ", Color(255, 255, 255), "Бой окончен!")
-                            UT_BATTLE_CORE.StopAllSystems()
-                        end
-                    end)
+                    if UT_BATTLE_ACTION and UT_BATTLE_ACTION.Spare then
+                        UT_BATTLE_ACTION.Spare()
+                    else
+                        UT_BATTLE_CORE.PlaySoundSafe("undertale-select-sound.mp3")
+                        chat.AddText(Color(255, 255, 0), "[UNDERTALE] ", Color(255, 255, 255), 
+                            "Пощада!")
+                        
+                        timer.Simple(2, function()
+                            if IsValid(UT_BATTLE_CORE.battleFrame) then
+                                chat.AddText(Color(0, 255, 0), "[UNDERTALE] ", Color(255, 255, 255), 
+                                    "Бой окончен!")
+                                UT_BATTLE_CORE.StopAllSystems()
+                            end
+                        end)
+                    end
                 end
                 return true
                 
@@ -463,26 +536,54 @@ if CLIENT then
                     local target = UT_BATTLE_CORE.currentTargets[UT_BATTLE_CORE.selectedTarget]
                     
                     if target.hp > 0 then
-                        UT_BATTLE_INPUT.StartAttack()
+                        if UT_BATTLE_ACTION and UT_BATTLE_ACTION.StartFight then
+                            UT_BATTLE_ACTION.StartFight()
+                        elseif UT_BATTLE_INPUT.StartAttack then
+                            UT_BATTLE_INPUT.StartAttack()
+                        end
                         UT_BATTLE_CORE.PlaySoundSafe("undertale-select-sound.mp3")
                     else
+                        local found = false
                         for i, enemy in ipairs(UT_BATTLE_CORE.currentTargets) do
                             if enemy.hp > 0 then
                                 UT_BATTLE_CORE.selectedTarget = i
+                                found = true
                                 UT_BATTLE_CORE.PlaySoundSafe("undertale-select-sound.mp3")
                                 chat.AddText(Color(255, 50, 50), "[БОЙ] ", Color(255, 255, 255), 
                                     "Цель мертва! Выбрана следующая.")
                                 break
                             end
                         end
+                        if not found then
+                            chat.AddText(Color(255, 50, 50), "[БОЙ] ", Color(255, 255, 255), 
+                                "Нет живых целей!")
+                        end
                     end
                 end
                 return true
                 
+            elseif UT_BATTLE_CORE.battleMode == "ACT_TARGET" then
+                local target = UT_BATTLE_CORE.currentTargets[UT_BATTLE_CORE.selectedTarget]
+                if target and target.hp > 0 then
+                    UT_BATTLE_CORE.actTarget = UT_BATTLE_CORE.selectedTarget
+                    UT_BATTLE_CORE.battleMode = "ACT"
+                    UT_BATTLE_CORE.selectedAct = 1
+                    if UT_BATTLE_HUD and UT_BATTLE_HUD.UpdateDialogPanel then
+                        UT_BATTLE_HUD.UpdateDialogPanel()
+                    end
+                    chat.AddText(Color(200, 200, 255), "[ACT] ", Color(255, 255, 255), 
+                        "Выберите действие для " .. target.name .. " (↑ ↓)")
+                end
+                return true
+                
             elseif UT_BATTLE_CORE.battleMode == "ACT" then
-                UT_BATTLE_CORE.PlaySoundSafe("undertale-select-sound.mp3")
-                chat.AddText(Color(255, 255, 0), "[ДЕЙСТВИЕ] ", Color(255, 255, 255), 
-                    "Ничего не произошло")
+                if UT_BATTLE_ACTION and UT_BATTLE_ACTION.PerformAct then
+                    UT_BATTLE_ACTION.PerformAct(UT_BATTLE_CORE.selectedAct or 1)
+                else
+                    UT_BATTLE_CORE.PlaySoundSafe("undertale-select-sound.mp3")
+                    chat.AddText(Color(255, 255, 0), "[ДЕЙСТВИЕ] ", Color(255, 255, 255), 
+                        "Ничего не произошло")
+                end
                 return true
             end
         end

@@ -37,6 +37,18 @@ include("ut_battle_hud.lua")
 AddCSLuaFile("ut_battle_input.lua")
 include("ut_battle_input.lua")
 
+-- 6.5. Хотфикс (ВРЕМЕННЫЙ)
+AddCSLuaFile("ut_hotfix.lua")
+include("ut_hotfix.lua")
+
+-- 6.6. Атаки врагов (НОВЫЙ)
+AddCSLuaFile("ut_enemy_attacks.lua")
+include("ut_enemy_attacks.lua")
+
+-- 6.7. Система печатания текста (НОВЫЙ)
+AddCSLuaFile("ut_typing.lua")
+include("ut_typing.lua")
+
 -- 7. Музыка
 AddCSLuaFile("ut_battle_music.lua")
 include("ut_battle_music.lua")
@@ -52,10 +64,19 @@ include("ut_spawnmenu.lua")
 -- 10. Основной файл
 AddCSLuaFile("ut_battle_main.lua")
 include("ut_battle_main.lua")
+ 
+-- 11. Данные врагов (НОВЫЙ)
+AddCSLuaFile("ut_enemy_data.lua")
+include("ut_enemy_data.lua")
 
--- 11. Исправления
+-- 12. Система действий (НОВЫЙ)
+AddCSLuaFile("ut_battle_action.lua")
+include("ut_battle_action.lua")
+
+-- 13. Исправления
 AddCSLuaFile("ut_fixes.lua")
 include("ut_fixes.lua")
+
 
 
 

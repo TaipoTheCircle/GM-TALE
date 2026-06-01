@@ -1,4 +1,4 @@
--- ФАЙЛ: ut_battle_hud.lua (С АНИМАЦИЕЙ ВРАГОВ)
+-- ФАЙЛ: ut_battle_hud.lua (С АНИМАЦИЕЙ ВРАГОВ И ПЕЧАТАНИЕМ ТЕКСТА)
 if CLIENT then
     print("[UNDERTALE] Загрузка модуля интерфейса с анимацией врагов...")
     
@@ -28,8 +28,8 @@ if CLIENT then
     UT_BATTLE_HUD.heartActive = false
     UT_BATTLE_HUD.currentMessage = ""
     
-    -- ====== НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ АНИМАЦИИ ВРАГОВ ======
-    UT_BATTLE_HUD.enemyAnimations = {}  -- Хранит данные анимации для каждого врага
+    -- ====== ПЕРЕМЕННЫЕ ДЛЯ АНИМАЦИИ ВРАГОВ ======
+    UT_BATTLE_HUD.enemyAnimations = {}
     
     -- Функция инициализации анимации для врага
     UT_BATTLE_HUD.InitEnemyAnimation = function(enemy)
@@ -39,24 +39,23 @@ if CLIENT then
         if not UT_BATTLE_HUD.enemyAnimations[enemyId] then
             UT_BATTLE_HUD.enemyAnimations[enemyId] = {
                 idleScale = 1.0,
-                idleDirection = 1,  -- 1 = увеличивается, -1 = уменьшается
-                idleSpeed = 0.8,    -- Скорость дыхания
+                idleDirection = 1,
+                idleSpeed = 0.8,
                 lastUpdate = CurTime(),
-                deathAnimProgress = 0,  -- 0 = жив, 1 = полностью исчез
+                deathAnimProgress = 0,
                 isDying = false
             }
         end
         return UT_BATTLE_HUD.enemyAnimations[enemyId]
     end
     
-    -- Функция обновления анимации врага (дыхание/пульсация)
+    -- Функция обновления анимации врага
     UT_BATTLE_HUD.UpdateEnemyAnimation = function(enemy, animData)
         if not enemy or not animData then return end
         
         local dt = FrameTime()
         
         if enemy.hp > 0 then
-            -- Живой враг - эффект дыхания (растягивание)
             if not animData.isDying then
                 animData.idleScale = animData.idleScale + (animData.idleDirection * animData.idleSpeed * dt)
                 
@@ -69,14 +68,13 @@ if CLIENT then
                 end
             end
         else
-            -- Мертвый враг - анимация исчезновения
             if not animData.isDying then
                 animData.isDying = true
                 animData.deathAnimProgress = 0
             end
             
             if animData.isDying and animData.deathAnimProgress < 1 then
-                animData.deathAnimProgress = math.min(1, animData.deathAnimProgress + dt * 2)  -- Исчезает за 0.5 сек
+                animData.deathAnimProgress = math.min(1, animData.deathAnimProgress + dt * 2)
             end
         end
         
@@ -88,11 +86,18 @@ if CLIENT then
     UT_BATTLE_HUD.gridMaterial = nil
     
     -- СОЗДАНИЕ ШРИФТОВ
-    surface.CreateFont("UT_Menu", {
-        font = "Arial",
+    surface.CreateFont("UT_Pixel", {
+        font = "Courier New",
         size = 24,
+        weight = 700,
+        antialias = false
+    })
+    
+    surface.CreateFont("UT_Pixel_Small", {
+        font = "Courier New",
+        size = 18,
         weight = 500,
-        antialias = true
+        antialias = false
     })
     
     surface.CreateFont("UT_Small", {
@@ -156,24 +161,20 @@ if CLIENT then
         return UT_BATTLE_HUD.gridMaterial
     end
     
-    -- ====== НОВАЯ ФУНКЦИЯ ДЛЯ ЖИВОГО ВРАГА (С АНИМАЦИЕЙ) ======
+    -- ====== ФУНКЦИЯ ДЛЯ ЖИВОГО ВРАГА ======
     UT_BATTLE_HUD.DrawLargeEnemy = function(enemy, x, y, w, h)
-        -- Инициализируем анимацию для врага
         local animData = UT_BATTLE_HUD.InitEnemyAnimation(enemy)
         animData = UT_BATTLE_HUD.UpdateEnemyAnimation(enemy, animData)
         
-        -- Определяем выбран ли враг
         local isSelected = false
         if UT_BATTLE_CORE.selectedTarget and UT_BATTLE_CORE.currentTargets then
             local selectedEnemy = UT_BATTLE_CORE.currentTargets[UT_BATTLE_CORE.selectedTarget]
             isSelected = selectedEnemy == enemy
         end
         
-        -- Применяем масштаб анимации (растягивание)
         local scaleX = animData.idleScale
-        local scaleY = 1 + (1 - animData.idleScale) * 0.5  -- Растягиваем больше по вертикали
+        local scaleY = 1 + (1 - animData.idleScale) * 0.5
         
-        -- Размеры спрайта с учётом анимации
         local baseW = w * 0.9
         local baseH = h * 0.85
         local spriteW = baseW * scaleX
@@ -181,7 +182,6 @@ if CLIENT then
         local spriteX = x + (w - spriteW) / 2
         local spriteY = y + (h - spriteH) / 2
         
-        -- Маленькая вибрация если враг выбран
         local shakeX = 0
         local shakeY = 0
         if isSelected then
@@ -189,23 +189,19 @@ if CLIENT then
             shakeY = math.cos(CurTime() * 18) * 1
         end
         
-        -- Спрайт врага
         local material = UT_BATTLE_HUD.GetEnemyMaterial(enemy.class or "npc_zombie")
         
         if material and not material:IsError() then
-            -- Толстая черная обводка
             surface.SetDrawColor(0, 0, 0, 220)
             for i = 1, 5 do
                 surface.DrawOutlinedRect(spriteX - i + shakeX, spriteY - i + shakeY, 
                     spriteW + i*2, spriteH + i*2, 1)
             end
             
-            -- Сам спрайт
             surface.SetDrawColor(255, 255, 255, 255)
             surface.SetMaterial(material)
             surface.DrawTexturedRect(spriteX + shakeX, spriteY + shakeY, spriteW, spriteH)
             
-            -- Желтая обводка для выбранного
             if isSelected then
                 surface.SetDrawColor(255, 255, 0, 220)
                 for i = 1, 6 do
@@ -214,7 +210,6 @@ if CLIENT then
                 end
             end
         else
-            -- Запасной вариант
             surface.SetDrawColor(200, 50, 50, 220)
             surface.DrawRect(spriteX + shakeX, spriteY + shakeY, spriteW, spriteH)
             
@@ -227,7 +222,6 @@ if CLIENT then
                 3, Color(0, 0, 0, 200))
         end
         
-        -- ИМЯ ВРАГА (только если жив и не в процессе исчезновения)
         if enemy.hp > 0 then
             local nameY = y + h + 10
             draw.SimpleTextOutlined(enemy.name or "Враг", "UT_EnemyName", 
@@ -235,20 +229,17 @@ if CLIENT then
                 Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER,
                 3, Color(0, 0, 0, 200))
             
-            -- HP БАР (только для живых)
             local hpPercent = math.max(0, enemy.hp / enemy.maxhp)
             local hpBarW = w * 0.8
             local hpBarH = 15
             local hpBarX = x + (w - hpBarW) / 2
             local hpBarY = nameY + 30
             
-            -- Фон HP бара
             surface.SetDrawColor(50, 50, 50, 200)
             surface.DrawRect(hpBarX, hpBarY, hpBarW, hpBarH)
             surface.SetDrawColor(0, 0, 0, 180)
             surface.DrawOutlinedRect(hpBarX - 2, hpBarY - 2, hpBarW + 4, hpBarH + 4, 3)
             
-            -- Заполнение HP бара
             local hpColor
             if hpPercent > 0.5 then
                 hpColor = Color(0, 255, 0, 255)
@@ -263,7 +254,6 @@ if CLIENT then
             surface.SetDrawColor(hpColor.r, hpColor.g, hpColor.b, 255)
             surface.DrawRect(hpBarX, hpBarY, hpBarW * hpPercent, hpBarH)
             
-            -- Текст HP
             draw.SimpleTextOutlined(math.ceil(enemy.hp) .. "/" .. enemy.maxhp, "UT_EnemyName", 
                 x + w/2, hpBarY - 20, 
                 Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER,
@@ -271,36 +261,29 @@ if CLIENT then
         end
     end
     
-    -- ====== НОВАЯ ФУНКЦИЯ ДЛЯ МЕРТВОГО ВРАГА (БЕЗ КРАСНЫХ ПОЛОС И НАДПИСИ) ======
+    -- ====== ФУНКЦИЯ ДЛЯ МЕРТВОГО ВРАГА ======
     UT_BATTLE_HUD.DrawDeadEnemy = function(enemy, x, y, w, h)
-        -- Инициализируем анимацию
         local animData = UT_BATTLE_HUD.InitEnemyAnimation(enemy)
         animData = UT_BATTLE_HUD.UpdateEnemyAnimation(enemy, animData)
         
-        -- Полупрозрачность в зависимости от прогресса исчезновения
         local alpha = 255 * (1 - animData.deathAnimProgress)
         
         if alpha <= 0 then
-            return  -- Полностью исчез, не рисуем
+            return
         end
         
-        -- Размеры с уменьшением при исчезновении
-        local scale = 1 - animData.deathAnimProgress * 0.5  -- Уменьшается до 50%
+        local scale = 1 - animData.deathAnimProgress * 0.5
         local spriteW = w * 0.8 * scale
         local spriteH = h * 0.75 * scale
         local spriteX = x + (w - spriteW) / 2
         local spriteY = y + (h - spriteH) / 2
         
-        -- Серый спрайт врага с прозрачностью
         local material = UT_BATTLE_HUD.GetEnemyMaterial(enemy.class or "npc_zombie")
         if material then
             surface.SetDrawColor(100, 100, 100, alpha * 0.7)
             surface.SetMaterial(material)
             surface.DrawTexturedRect(spriteX, spriteY, spriteW, spriteH)
         end
-        
-        -- ❌ НЕТ КРАСНЫХ КРЕСТОВ И НАДПИСИ "МЕРТВ"
-        -- Просто серый исчезающий спрайт
     end
     
     -- ====== ФУНКЦИЯ ОТРИСОВКИ ВРАГОВ ======
@@ -309,13 +292,11 @@ if CLIENT then
             return 
         end
         
-        -- Размеры PNG фона
         local gridW = 1609
         local gridH = 580
         local gridX = ScrW()/2 - gridW/2
         local gridY = ScrH() * 0.03
         
-        -- Рисуем PNG фон
         local gridMaterial = UT_BATTLE_HUD.GetGridMaterial()
         if gridMaterial then
             surface.SetDrawColor(255, 255, 255, 180)
@@ -323,7 +304,6 @@ if CLIENT then
             surface.DrawTexturedRect(gridX, gridY, gridW, gridH)
         end
         
-        -- Отрисовка врагов
         local enemies = UT_BATTLE_CORE.currentTargets
         local enemyCount = #enemies
         
@@ -399,7 +379,6 @@ if CLIENT then
             end
         end
         
-        -- Стрелка выбора
         if UT_BATTLE_CORE.battleMode == "FIGHT" and UT_BATTLE_CORE.selectedTarget then
             local selectedEnemy = UT_BATTLE_CORE.currentTargets[UT_BATTLE_CORE.selectedTarget]
             if selectedEnemy and selectedEnemy.hp > 0 then
@@ -440,11 +419,7 @@ if CLIENT then
                     3, Color(0, 0, 0, 200))
             end
         end
-
-    
-
-    print("[UNDERTALE] Модуль интерфейса с анимацией врагов загружен")
-end
+    end
     
     -- ДОБАВЛЕНИЕ СООБЩЕНИЯ В ДИАЛОГ
     UT_BATTLE_HUD.AddHeartMessage = function(message)
@@ -457,68 +432,171 @@ end
         
         print("[UNDERTALE] Сообщение сердца: "..message)
         
-        -- Обновляем диалоговую панель
         if IsValid(UT_BATTLE_CORE.dialogPanel) then
             UT_BATTLE_CORE.dialogPanel.Paint = function(self, w, h)
                 draw.RoundedBox(30, 0, 0, w, h, Color(0, 0, 0, 230))
                 surface.SetDrawColor(255, 255, 255, 150)
                 surface.DrawOutlinedRect(0, 0, w, h, 2)
                 
-                -- Отображаем текущее сообщение
-                draw.SimpleText(UT_BATTLE_HUD.currentMessage, "UT_Menu", w/2, h/2 - 20, 
+                draw.SimpleText(UT_BATTLE_HUD.currentMessage, "UT_Pixel", w/2, h/2 - 20, 
                     Color(255, 255, 255), TEXT_ALIGN_CENTER)
                 
-                -- HP игрока внизу
-                draw.SimpleText("ВАШЕ HP: "..(UT_BATTLE_CORE.playerHp or 20).."/20", "UT_Menu", 
+                draw.SimpleText("ВАШЕ HP: "..(UT_BATTLE_CORE.playerHp or 20).."/20", "UT_Pixel", 
                     w/2, h - 30, Color(255, 255, 255), TEXT_ALIGN_CENTER)
             end
         end
     end
     
-    -- ОБНОВЛЕНИЕ ДИАЛОГОВОЙ ПАНЕЛИ (ДЛЯ РЕЖИМА FIGHT - ПОКАЗЫВАЕМ ВСЕХ ВРАГОВ)
-    UT_BATTLE_HUD.UpdateDialogPanel = function()
-        if not UT_BATTLE_CORE or not IsValid(UT_BATTLE_CORE.dialogPanel) then 
-            print("[UNDERTALE] Диалоговая панель не существует")
-            return 
+    -- ====== ФУНКЦИЯ ПЕЧАТАНИЯ ТЕКСТА ======
+    function UT_BATTLE_HUD.ShowTypingDialogText(message, panel, onComplete)
+        if not IsValid(panel) then return end
+        
+        local fullText = message
+        local charIndex = 0
+        local displayedText = ""
+        local lastCharTime = CurTime()
+        local typingSpeed = 0.05
+        local isComplete = false
+        
+        local hookId = "UT_DialogTyping_" .. tostring(panel)
+        
+        if panel.typingActive then
+            hook.Remove("Think", hookId)
+            panel.typingActive = false
         end
         
-        UT_BATTLE_HUD.currentEnemyMessage = UT_BATTLE_HUD.currentEnemyMessage or ""
+        panel.typingActive = true
+        panel.Paint = nil
         
-        UT_BATTLE_CORE.dialogPanel.Paint = function(self, w, h)
-            draw.RoundedBox(30, 0, 0, w, h, Color(0, 0, 0, 230))
+        local function UpdateTyping()
+            if not IsValid(panel) then 
+                hook.Remove("Think", hookId)
+                return 
+            end
+            
+            if isComplete then return end
+            
+            local currentTime = CurTime()
+            
+            if currentTime - lastCharTime >= typingSpeed then
+                if charIndex < #fullText then
+                    charIndex = charIndex + 1
+                    displayedText = string.sub(fullText, 1, charIndex)
+                    lastCharTime = currentTime
+                    
+                    if UT_SOUNDS and UT_SOUNDS.PlayTypingSound then
+                        UT_SOUNDS.PlayTypingSound()
+                    end
+                    
+                    panel:InvalidateLayout()
+                else
+                    isComplete = true
+                    panel.typingActive = false
+                    if onComplete then
+                        onComplete()
+                    end
+                    hook.Remove("Think", hookId)
+                end
+            end
+        end
+        
+        hook.Add("Think", hookId, UpdateTyping)
+        
+        panel.Paint = function(self, w, h)
+            draw.RoundedBox(8, 0, 0, w, h, Color(0, 0, 0, 230))
             surface.SetDrawColor(255, 255, 255, 150)
             surface.DrawOutlinedRect(0, 0, w, h, 2)
             
-            if UT_BATTLE_CORE.battleMode == "MENU" then
-                if UT_BATTLE_CORE.currentEnemy and UT_BATTLE_CORE.currentEnemy.data then
-                    local enemyData = UT_BATTLE_CORE.currentEnemy.data
-                    
-                    if UT_BATTLE_HUD.currentEnemyMessage == "" and enemyData.dialog then
-                        local dialogLines = enemyData.dialog
-                        if #dialogLines > 0 then
-                            UT_BATTLE_HUD.currentEnemyMessage = dialogLines[math.random(#dialogLines)]
-                        else
-                            UT_BATTLE_HUD.currentEnemyMessage = "* Враг перед вами..."
-                        end
-                    end
-                    
-                    draw.SimpleText(UT_BATTLE_HUD.currentEnemyMessage, "UT_Menu", w/2, h/2 - 20, 
-                        Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-                        
-                    draw.SimpleText("Что вы будете делать?", "UT_Menu", w/2, h/2 + 20, 
-                        Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            local cleanText = displayedText
+            if cleanText then
+                cleanText = cleanText:gsub("%!%!", "!")
+                cleanText = cleanText:gsub("%?%?", "?")
+            end
+            
+            draw.SimpleText(cleanText or "", "UT_Pixel", 
+                w/2, h/2 - 20, 
+                Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            
+            if not isComplete and math.floor(CurTime() * 12) % 2 == 0 then
+                surface.SetFont("UT_Pixel")
+                local textWidth = surface.GetTextSize(cleanText or "")
+                draw.SimpleText("_", "UT_Pixel", 
+                    w/2 + textWidth/2 + 8, h/2 - 20,
+                    Color(255, 255, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            end
+            
+            draw.SimpleText("HP "..(UT_BATTLE_CORE and UT_BATTLE_CORE.playerHp or 20).." / 20", "UT_Pixel_Small", 
+                w - 20, h - 25, Color(255, 255, 255), TEXT_ALIGN_RIGHT)
+        end
+    end
+    
+    -- ====== ОБНОВЛЕНИЕ ДИАЛОГОВОЙ ПАНЕЛИ ======
+    UT_BATTLE_HUD.UpdateDialogPanel = function()
+        if not UT_BATTLE_CORE or not IsValid(UT_BATTLE_CORE.dialogPanel) then 
+            return 
+        end
+        
+        local panel = UT_BATTLE_CORE.dialogPanel
+        
+        if UT_BATTLE_CORE.battleMode == "MENU" then
+            local dialogText = ""
+            local showExtraText = false
+            local extraText = ""
+            
+            if UT_BATTLE_CORE.currentEnemy and UT_BATTLE_CORE.currentEnemy.data then
+                local enemyData = UT_BATTLE_CORE.currentEnemy.data
+                if enemyData.dialog and #enemyData.dialog > 0 then
+                    dialogText = enemyData.dialog[math.random(#enemyData.dialog)]
                 else
-                    draw.SimpleText("Что вы будетете делать?", "UT_Menu", w/2, h/2, 
-                        Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                    dialogText = "* Враг перед вами..."
                 end
-                    
-            elseif UT_BATTLE_CORE.battleMode == "FIGHT" and not UT_BATTLE_CORE.attackInProgress then
-                -- В РЕЖИМЕ FIGHT ПОКАЗЫВАЕМ СПИСОК ВСЕХ ВРАГОВ (как в Undertale)
+            else
+                dialogText = "* Что вы будете делать?"
+            end
+            showExtraText = true
+            extraText = "Что вы будете делать?"
+            
+            dialogText = dialogText:gsub("%!%!", "!")
+            dialogText = dialogText:gsub("%?%?", "?")
+            
+            if dialogText ~= "" then
+                UT_BATTLE_HUD.ShowTypingDialogText(dialogText, panel, function()
+                    if showExtraText and extraText ~= "" then
+                        timer.Simple(0.3, function()
+                            if IsValid(panel) then
+                                panel.Paint = function(self, w, h)
+                                    draw.RoundedBox(8, 0, 0, w, h, Color(0, 0, 0, 230))
+                                    surface.SetDrawColor(255, 255, 255, 150)
+                                    surface.DrawOutlinedRect(0, 0, w, h, 2)
+                                    
+                                    draw.SimpleText(dialogText, "UT_Pixel", 
+                                        w/2, h/2 - 30, 
+                                        Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                                    
+                                    draw.SimpleText(extraText, "UT_Pixel", 
+                                        w/2, h/2 + 10, 
+                                        Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                                    
+                                    draw.SimpleText("HP "..(UT_BATTLE_CORE.playerHp or 20).." / 20", "UT_Pixel_Small", 
+                                        w - 20, h - 25, Color(255, 255, 255), TEXT_ALIGN_RIGHT)
+                                end
+                            end
+                        end)
+                    end
+                end)
+            end
+            
+        elseif UT_BATTLE_CORE.battleMode == "FIGHT" and not UT_BATTLE_CORE.attackInProgress then
+            panel.Paint = function(self, w, h)
+                draw.RoundedBox(30, 0, 0, w, h, Color(0, 0, 0, 230))
+                surface.SetDrawColor(255, 255, 255, 150)
+                surface.DrawOutlinedRect(0, 0, w, h, 2)
+                
                 if UT_BATTLE_CORE.currentTargets and #UT_BATTLE_CORE.currentTargets > 0 then
                     local startY = 30
                     local lineHeight = 40
                     
-                    draw.SimpleText("Кого атаковать?", "UT_Menu", 50, 20, Color(255, 255, 255))
+                    draw.SimpleText("Кого атаковать?", "UT_Pixel", 50, 20, Color(255, 255, 255))
                     
                     for i, enemy in ipairs(UT_BATTLE_CORE.currentTargets) do
                         local yPos = startY + (i-1) * lineHeight
@@ -534,13 +612,11 @@ end
                             prefix = "► "
                         end
                         
-                        -- Имя врага и HP
                         local enemyText = prefix .. enemy.name
-                        draw.SimpleText(enemyText, "UT_Menu", 70, yPos, color)
+                        draw.SimpleText(enemyText, "UT_Pixel", 70, yPos, color)
                         
-                        -- HP справа
-                        local hpColor = Color(255, 255, 255)
                         if enemy.hp > 0 then
+                            local hpColor = Color(255, 255, 255)
                             local hpPercent = enemy.hp / enemy.maxhp
                             if hpPercent < 0.3 then
                                 hpColor = Color(255, 50, 50)
@@ -550,39 +626,126 @@ end
                                 hpColor = Color(50, 255, 50)
                             end
                             
-                            draw.SimpleText("♥ " .. math.ceil(enemy.hp) .. "/" .. enemy.maxhp, "UT_Menu", 
+                            draw.SimpleText("♥ " .. math.ceil(enemy.hp) .. "/" .. enemy.maxhp, "UT_Pixel", 
                                 w - 50, yPos, hpColor, TEXT_ALIGN_RIGHT)
                         else
-                            draw.SimpleText("МЕРТВ", "UT_Menu", 
+                            draw.SimpleText("МЕРТВ", "UT_Pixel", 
                                 w - 50, yPos, Color(200, 50, 50), TEXT_ALIGN_RIGHT)
                         end
                     end
                     
-                    -- Подсказка управления
                     draw.SimpleText("↑ ↓ - Выбор цели", "UT_Small", 50, h - 60, Color(200, 200, 255))
                     draw.SimpleText("ENTER - Атаковать", "UT_Small", 50, h - 35, Color(200, 255, 200))
                     draw.SimpleText("ESC - Назад", "UT_Small", w - 50, h - 35, Color(255, 200, 200), TEXT_ALIGN_RIGHT)
                 end
                 
-            elseif UT_BATTLE_CORE.battleMode == "ACT" then
-                draw.SimpleText("* Выберите действие", "UT_Menu", 50, 50, Color(255, 255, 255))
+                draw.SimpleText("ВАШЕ HP: "..(UT_BATTLE_CORE.playerHp or 20).."/20", "UT_Pixel", 
+                    w/2, h - 30, Color(255, 255, 255), TEXT_ALIGN_CENTER)
+            end
+            
+        elseif UT_BATTLE_CORE.battleMode == "ACT_TARGET" then
+            panel.Paint = function(self, w, h)
+                draw.RoundedBox(30, 0, 0, w, h, Color(0, 0, 0, 230))
+                surface.SetDrawColor(255, 255, 255, 150)
+                surface.DrawOutlinedRect(0, 0, w, h, 2)
                 
-                local actions = {"ПРИВЕТСТВОВАТЬ", "ПОДАРИТЬ ЦВЕТОК", "РАССКАЗАТЬ ШУТКУ"}
+                if UT_BATTLE_CORE.currentTargets and #UT_BATTLE_CORE.currentTargets > 0 then
+                    local startY = 30
+                    local lineHeight = 40
+                    
+                    draw.SimpleText("На кого применить действие?", "UT_Pixel", 50, 20, Color(255, 255, 255))
+                    
+                    for i, enemy in ipairs(UT_BATTLE_CORE.currentTargets) do
+                        local yPos = startY + (i-1) * lineHeight
+                        local isSelected = (i == UT_BATTLE_CORE.selectedTarget)
+                        local color = Color(255, 255, 255)
+                        local prefix = "  "
+                        
+                        if enemy.hp <= 0 then
+                            color = Color(150, 150, 150, 150)
+                            prefix = "✝ "
+                        elseif isSelected then
+                            color = Color(255, 255, 0)
+                            prefix = "► "
+                        end
+                        
+                        local enemyText = prefix .. enemy.name
+                        draw.SimpleText(enemyText, "UT_Pixel", 70, yPos, color)
+                        
+                        if enemy.hp > 0 then
+                            local hpColor = Color(255, 255, 255)
+                            local hpPercent = enemy.hp / enemy.maxhp
+                            if hpPercent < 0.3 then
+                                hpColor = Color(255, 50, 50)
+                            elseif hpPercent < 0.7 then
+                                hpColor = Color(255, 255, 50)
+                            else
+                                hpColor = Color(50, 255, 50)
+                            end
+                            
+                            draw.SimpleText("♥ " .. math.ceil(enemy.hp) .. "/" .. enemy.maxhp, "UT_Pixel", 
+                                w - 50, yPos, hpColor, TEXT_ALIGN_RIGHT)
+                        else
+                            draw.SimpleText("МЕРТВ", "UT_Pixel", 
+                                w - 50, yPos, Color(200, 50, 50), TEXT_ALIGN_RIGHT)
+                        end
+                    end
+                    
+                    draw.SimpleText("↑ ↓ - Выбор цели", "UT_Small", 50, h - 60, Color(200, 200, 255))
+                    draw.SimpleText("ENTER - Подтвердить", "UT_Small", 50, h - 35, Color(200, 255, 200))
+                    draw.SimpleText("ESC - Назад", "UT_Small", w - 50, h - 35, Color(255, 200, 200), TEXT_ALIGN_RIGHT)
+                end
+                
+                draw.SimpleText("ВАШЕ HP: "..(UT_BATTLE_CORE.playerHp or 20).."/20", "UT_Pixel", 
+                    w/2, h - 30, Color(255, 255, 255), TEXT_ALIGN_CENTER)
+            end
+            
+        elseif UT_BATTLE_CORE.battleMode == "ACT" then
+            panel.Paint = function(self, w, h)
+                draw.RoundedBox(30, 0, 0, w, h, Color(0, 0, 0, 230))
+                surface.SetDrawColor(255, 255, 255, 150)
+                surface.DrawOutlinedRect(0, 0, w, h, 2)
+                
+                local target = UT_BATTLE_CORE.currentTargets and UT_BATTLE_CORE.currentTargets[UT_BATTLE_CORE.selectedTarget]
+                local actions = {}
+                
+                if target and target.class and UT_ENEMY_DATA then
+                    local enemy_data = UT_ENEMY_DATA.Get(target.class)
+                    if enemy_data and enemy_data.acts then
+                        for _, act in ipairs(enemy_data.acts) do
+                            table.insert(actions, act.name)
+                        end
+                    end
+                end
+                
+                if #actions == 0 then
+                    actions = {"ПРОВЕРИТЬ", "ПОГОВОРИТЬ", "ПОЩАДИТЬ"}
+                end
+                
+                draw.SimpleText("* Выберите действие", "UT_Pixel", 50, 50, Color(255, 255, 255))
                 
                 for i, action in ipairs(actions) do
                     local yPos = 100 + (i-1) * 50
                     local color = Color(255, 255, 255)
                     
-                    if i == (UT_BATTLE_CORE.selectedTarget or 1) then
+                    if i == (UT_BATTLE_CORE.selectedAct or 1) then
                         color = Color(255, 255, 0)
-                        draw.SimpleText("►", "UT_Menu", 50, yPos, color)
+                        draw.SimpleText("►", "UT_Pixel", 50, yPos, color)
                     end
                     
-                    draw.SimpleText("* "..action, "UT_Menu", 90, yPos, color)
+                    draw.SimpleText("* "..action, "UT_Pixel", 90, yPos, color)
                 end
                 
-            elseif UT_BATTLE_CORE.battleMode == "ATTACK" then
-                -- Фон атаки
+                draw.SimpleText("↑ ↓ - Выбор действия", "UT_Small", 50, h - 60, Color(200, 200, 255))
+                draw.SimpleText("ENTER - Выполнить", "UT_Small", 50, h - 35, Color(200, 255, 200))
+                draw.SimpleText("ESC - Назад", "UT_Small", w - 50, h - 35, Color(255, 200, 200), TEXT_ALIGN_RIGHT)
+                
+                draw.SimpleText("ВАШЕ HP: "..(UT_BATTLE_CORE.playerHp or 20).."/20", "UT_Pixel", 
+                    w/2, h - 30, Color(255, 255, 255), TEXT_ALIGN_CENTER)
+            end
+            
+        elseif UT_BATTLE_CORE.battleMode == "ATTACK" then
+            panel.Paint = function(self, w, h)
                 surface.SetDrawColor(30, 30, 50, 200)
                 surface.DrawRect(0, 0, w, h)
                 
@@ -594,7 +757,6 @@ end
                     surface.DrawLine(0, i, w, i)
                 end
                 
-                -- ЗОНА МАКСИМАЛЬНОГО УРОНА
                 local zoneColor = Color(0, 255, 0, 50)
                 if UT_BATTLE_CORE.attackResult == "hit" or UT_BATTLE_CORE.attackResult == "critical" then
                     zoneColor = Color(255, 255, 0, 80)
@@ -608,11 +770,9 @@ end
                 surface.DrawOutlinedRect(UT_BATTLE_CORE.attackHitZone.start, 0, 
                     UT_BATTLE_CORE.attackHitZone.finish - UT_BATTLE_CORE.attackHitZone.start, h, 2)
                     
-                -- ТЕКСТ "АТАКА!"
                 draw.SimpleText("АТАКА!", "UT_Attack", w/2, 30, 
                     Color(255, 255, 255), TEXT_ALIGN_CENTER)
                 
-                -- ДВИЖУЩАЯСЯ ПОЛОСКА
                 if UT_BATTLE_CORE.attackActive or UT_BATTLE_CORE.attackResult then
                     local barColor = Color(255, 255, 255)
                     if UT_BATTLE_CORE.attackResult == "hit" then
@@ -623,7 +783,6 @@ end
                         barColor = Color(255, 50, 50)
                     end
                     
-                    -- Мигание при попадании
                     if UT_BATTLE_CORE.attackResult and CurTime() - UT_BATTLE_CORE.attackBlinkTimer < 0.5 then
                         local blink = math.sin(CurTime() * 20) > 0
                         if blink then
@@ -643,7 +802,6 @@ end
                                     UT_BATTLE_CORE.attackBarPos + UT_BATTLE_CORE.attackBarWidth/2, h/2 + 15)
                 end
                 
-                -- РЕЗУЛЬТАТ АТАКИ
                 if UT_BATTLE_CORE.attackResult then
                     local resultText = ""
                     local resultColor = Color(255, 255, 255)
@@ -659,52 +817,44 @@ end
                         resultColor = Color(255, 50, 50)
                     end
                     
-                    draw.SimpleText(resultText, "UT_Menu", w/2, h - 50, 
+                    draw.SimpleText(resultText, "UT_Pixel", w/2, h - 50, 
                         resultColor, TEXT_ALIGN_CENTER)
                 end
                 
-                -- ПОДСКАЗКА
                 if UT_BATTLE_CORE.attackActive then
                     draw.SimpleText("Нажмите ПРОБЕЛ когда полоска в зелёной зоне!", "UT_Small", 
                         w/2, h - 80, Color(255, 255, 255), TEXT_ALIGN_CENTER)
                 end
+            end
+            
+        elseif UT_BATTLE_CORE.battleMode == "HEART_PHASE" then
+            panel.Paint = function(self, w, h)
+                draw.RoundedBox(30, 0, 0, w, h, Color(0, 0, 0, 230))
+                surface.SetDrawColor(255, 255, 255, 150)
+                surface.DrawOutlinedRect(0, 0, w, h, 2)
                 
-            elseif UT_BATTLE_CORE.battleMode == "HEART_PHASE" then
                 if UT_BATTLE_HUD.currentMessage ~= "" then
-                    draw.SimpleText(UT_BATTLE_HUD.currentMessage, "UT_Menu", 50, 50, 
+                    draw.SimpleText(UT_BATTLE_HUD.currentMessage, "UT_Pixel", 50, 50, 
                         Color(255, 255, 255))
                 else
-                    draw.SimpleText("* Враг атакует! Уклоняйтесь!", "UT_Menu", 50, 50, 
+                    draw.SimpleText("* Враг атакует! Уклоняйтесь!", "UT_Pixel", 50, 50, 
                         Color(255, 255, 255))
                 end
                 
                 local player_hp = UT_HEART_CORE and UT_HEART_CORE.player and UT_HEART_CORE.player.hp or (UT_BATTLE_CORE.playerHp or 20)
-                draw.SimpleText("ВАШЕ HP: "..player_hp.."/20", "UT_Menu", 
+                draw.SimpleText("ВАШЕ HP: "..player_hp.."/20", "UT_Pixel", 
                     w/2, h - 30, Color(255, 255, 255), TEXT_ALIGN_CENTER)
                     
                 draw.SimpleText("← ↑ ↓ → - Уклонение", "UT_Small", 
                     w/2, h - 60, Color(200, 200, 255), TEXT_ALIGN_CENTER)
-                    
-            elseif UT_BATTLE_CORE.battleMode == "HEART" then
-                if UT_BATTLE_HUD.currentMessage ~= "" then
-                    draw.SimpleText(UT_BATTLE_HUD.currentMessage, "UT_Menu", 50, 50, 
-                        Color(255, 255, 255))
-                else
-                    draw.SimpleText("* Враг готовится атаковать...", "UT_Menu", 50, 50, 
-                        Color(255, 255, 255))
-                end
-                
-                draw.SimpleText("ВАШЕ HP: "..(UT_BATTLE_CORE.playerHp or 20).."/20", "UT_Menu", 
-                    w/2, h - 30, Color(255, 255, 255), TEXT_ALIGN_CENTER)
             end
         end
     end
     
-    -- СОЗДАНИЕ БОЕВОГО МЕНЮ
+    -- ====== СОЗДАНИЕ БОЕВОГО МЕНЮ ======
     UT_BATTLE_HUD.CreateBattleMenu = function()
         print("[UNDERTALE] Создание боевого меню с PNG фоном...")
         
-        -- ВАЖНО: Проверяем что UT_BATTLE_CORE существует
         if not UT_BATTLE_CORE then
             print("[UNDERTALE] КРИТИЧЕСКАЯ ОШИБКА: UT_BATTLE_CORE не существует!")
             chat.AddText(Color(255, 0, 0), "[ОШИБКА] ", Color(255, 255, 255), 
@@ -712,7 +862,6 @@ end
             return
         end
         
-        -- Инициализируем если нужно
         if UT_BATTLE_CORE.battleActive == nil then
             UT_BATTLE_CORE.battleActive = false
         end
@@ -725,6 +874,7 @@ end
         UT_BATTLE_CORE.battleActive = true
         UT_BATTLE_CORE.selectedButton = 1
         UT_BATTLE_CORE.selectedTarget = 1
+        UT_BATTLE_CORE.selectedAct = 1
         UT_BATTLE_CORE.battleMode = "MENU"
         UT_BATTLE_CORE.keyCooldown = 0
         UT_BATTLE_CORE.btnImages = {}
@@ -732,7 +882,6 @@ end
         UT_BATTLE_CORE.attackInProgress = false
         UT_BATTLE_CORE.attackResult = nil
         
-        -- Инициализация кнопок если не существует
         if not UT_BATTLE_CORE.buttons then
             UT_BATTLE_CORE.buttons = {
                 { name = "FIGHT", normal = "undertale/attack.png", selected = "undertale/attack_use.png" },
@@ -742,7 +891,6 @@ end
             }
         end
         
-        -- Используем данные врага из триггера или тестовые
         if not UT_BATTLE_CORE.currentTargets or #UT_BATTLE_CORE.currentTargets == 0 then
             UT_BATTLE_CORE.currentTargets = {
                 {name = "СОЛДАТ", hp = 30, maxhp = 30, class = "npc_combine_s"},
@@ -752,7 +900,6 @@ end
             }
         end
         
-        -- СОЗДАЕМ ОСНОВНОЙ ФРЕЙМ
         if IsValid(UT_BATTLE_CORE.battleFrame) then UT_BATTLE_CORE.battleFrame:Remove() end
         
         UT_BATTLE_CORE.battleFrame = vgui.Create("DFrame")
@@ -764,33 +911,25 @@ end
         UT_BATTLE_CORE.battleFrame:MakePopup()
         UT_BATTLE_CORE.battleFrame:SetKeyboardInputEnabled(true)
         
-        -- ФОН ФРЕЙМА С ОТОБРАЖЕНИЕМ PNG ФОНА И ВРАГОВ
         UT_BATTLE_CORE.battleFrame.Paint = function(self, w, h)
-            -- Черный фон
             surface.SetDrawColor(0, 0, 0, 255)
             surface.DrawRect(0, 0, w, h)
-            
-            -- Рисуем PNG фон с врагами
             UT_BATTLE_HUD.DrawEnemiesOnGrid()
             
-            -- Затемненная область под диалоговой панелью
             local dialogY = ScrH() * 0.55
             surface.SetDrawColor(0, 0, 0, 180)
             surface.DrawRect(0, dialogY - 50, w, h - dialogY + 50)
             
-            -- Градиент сверху
             for i = 0, 50 do
                 local alpha = 255 * (1 - i/50)
                 surface.SetDrawColor(0, 0, 0, alpha)
                 surface.DrawRect(0, i, w, 1)
             end
             
-            -- Подсказка в углу
             draw.SimpleText("UNDERTALE BATTLE SYSTEM", "UT_Small", 20, 20, 
                 Color(0, 255, 0, 150))
         end
         
-        -- ДИАЛОГОВАЯ ПАНЕЛЬ
         local dialogW = 900
         local dialogH = 250
         UT_BATTLE_CORE.dialogPanel = vgui.Create("DPanel", UT_BATTLE_CORE.battleFrame)
@@ -799,7 +938,6 @@ end
         
         UT_BATTLE_HUD.UpdateDialogPanel()
         
-        -- ПАНЕЛЬ КНОПОК
         UT_BATTLE_CORE.btnPanel = vgui.Create("DPanel", UT_BATTLE_CORE.battleFrame)
         UT_BATTLE_CORE.btnPanel:SetSize(ScrW(), 130)
         UT_BATTLE_CORE.btnPanel:SetPos(0, ScrH() - 130)
@@ -844,7 +982,6 @@ end
                     if UT_BATTLE_CORE.battleMode == "MENU" and UT_BATTLE_CORE.selectedButton == i then
                         surface.SetDrawColor(255, 255, 0, 30)
                         surface.DrawRect(0, 0, w, h)
-                        
                         surface.SetDrawColor(255, 255, 0, 200)
                         surface.DrawOutlinedRect(0, 0, w, h, 3)
                     end
@@ -862,12 +999,11 @@ end
                 btnContainer:SetPos(currentX, btnY)
                 btnContainer.Paint = function() end
                 
-                -- Создаем простую кнопку как запасной вариант
                 local simpleBtn = vgui.Create("DButton", btnContainer)
                 simpleBtn:SetSize(btnW, btnH)
                 simpleBtn:SetPos(0, 0)
                 simpleBtn:SetText(data.name)
-                simpleBtn:SetFont("UT_Menu")
+                simpleBtn:SetFont("UT_Pixel")
                 simpleBtn.Paint = function(self, w, h)
                     surface.SetDrawColor(100, 100, 100, 200)
                     surface.DrawRect(0, 0, w, h)
@@ -884,12 +1020,10 @@ end
             currentX = currentX + btnW + spacing
         end
         
-        -- ПАНЕЛЬ ИНФОРМАЦИИ ОБ ИГРОКЕ
         local fightBtnIndex = 1
         local fightBtnX = 0
         local fightBtnWidth = 0
         
-        -- Находим кнопку FIGHT для позиционирования
         for i, data in ipairs(UT_BATTLE_CORE.buttons) do
             if data.name == "FIGHT" then
                 fightBtnIndex = i
@@ -933,7 +1067,6 @@ end
         UT_BATTLE_CORE.infoPanel.Paint = function(self, w, h)
             surface.SetDrawColor(0, 0, 0, 200)
             surface.DrawRect(0, 0, w, h)
-            
             surface.SetDrawColor(255, 255, 255, 100)
             surface.DrawOutlinedRect(0, 0, w, h, 1)
             
@@ -979,14 +1112,12 @@ end
             UT_BATTLE_CORE.UpdateButtonImages()
         end
         
-        -- ОБРАБОТКА КЛАВИАТУРЫ
         UT_BATTLE_CORE.battleFrame.OnKeyCodePressed = function(self, key)
             if UT_BATTLE_INPUT and UT_BATTLE_INPUT.HandleKeyPress then
                 UT_BATTLE_INPUT.HandleKeyPress(key)
             end
         end
         
-        -- НАСТРОЙКА ХУКА ВВОДА (НУЖНО ОБНОВИТЬ UT_BATTLE_INPUT.lua ДЛЯ НОВОЙ НАВИГАЦИИ)
         if UT_BATTLE_INPUT and UT_BATTLE_INPUT.SetupInputHook then
             UT_BATTLE_INPUT.SetupInputHook()
         end
@@ -994,7 +1125,7 @@ end
         print("[UNDERTALE] Боевое меню с PNG фоном создано!")
         chat.AddText(Color(0, 255, 0), "[UNDERTALE] ", Color(255, 255, 255), "Бой начат!")
         chat.AddText(Color(255, 255, 0), "[ПОДСКАЗКА] ", Color(255, 255, 255), 
-            "↑ ↓ для выбора цели в списке, ENTER для действия, ESC для выхода")
+            "← → для выбора действия, ↑ ↓ для выбора цели/действия, ENTER для подтверждения")
     end
     
     -- ВОССТАНОВЛЕНИЕ ПАНЕЛИ ПОСЛЕ СЕРДЦА
@@ -1007,5 +1138,84 @@ end
         end
     end
     
-    print("[UNDERTALE] Модуль интерфейса БЕЗ СЕТКИ загружен")
+    -- Показ числа урона
+    function UT_BATTLE_HUD.ShowDamageNumber(damage, is_critical)
+        if not IsValid(UT_BATTLE_CORE.dialogPanel) then return end
+        
+        local damage_number = {
+            value = damage,
+            is_critical = is_critical,
+            x = ScrW() / 2,
+            y = ScrH() * 0.55 + 125,
+            alpha = 255,
+            scale = 1.0,
+            lifetime = 0
+        }
+        
+        local function DrawDamageNumber()
+            if damage_number.lifetime > 1.5 then
+                hook.Remove("HUDPaint", "UT_DamageNumber")
+                return
+            end
+            
+            damage_number.lifetime = damage_number.lifetime + FrameTime()
+            damage_number.y = damage_number.y - 100 * FrameTime()
+            damage_number.alpha = 255 * (1 - damage_number.lifetime / 1.5)
+            damage_number.scale = 1 + damage_number.lifetime
+            
+            local color = damage_number.is_critical and Color(255, 255, 0) or Color(255, 255, 255)
+            color.a = damage_number.alpha
+            
+            draw.SimpleText(
+                tostring(damage_number.value),
+                "UT_Attack",
+                damage_number.x,
+                damage_number.y,
+                color,
+                TEXT_ALIGN_CENTER,
+                TEXT_ALIGN_CENTER
+            )
+        end
+        
+        hook.Add("HUDPaint", "UT_DamageNumber", DrawDamageNumber)
+        
+        if is_critical then
+            UT_BATTLE_HUD.ScreenShake(5, 0.3)
+        end
+    end
+    
+    -- Тряска экрана
+    function UT_BATTLE_HUD.ScreenShake(intensity, duration)
+        local start_time = CurTime()
+        
+        local function ApplyShake()
+            if CurTime() - start_time > duration then
+                hook.Remove("HUDPaint", "UT_ScreenShake")
+                return
+            end
+            
+            local progress = (CurTime() - start_time) / duration
+            local current_intensity = intensity * (1 - progress)
+            
+            local shake_x = math.sin(CurTime() * 50) * current_intensity
+            local shake_y = math.cos(CurTime() * 47) * current_intensity
+            
+            if IsValid(UT_BATTLE_CORE.dialogPanel) then
+                UT_BATTLE_CORE.dialogPanel:SetPos(
+                    ScrW()/2 - 450 + shake_x,
+                    ScrH() * 0.55 + shake_y
+                )
+            end
+        end
+        
+        hook.Add("HUDPaint", "UT_ScreenShake", ApplyShake)
+        
+        timer.Simple(duration + 0.1, function()
+            if IsValid(UT_BATTLE_CORE.dialogPanel) then
+                UT_BATTLE_CORE.dialogPanel:SetPos(ScrW()/2 - 450, ScrH() * 0.55)
+            end
+        end)
+    end
+    
+    print("[UNDERTALE] Модуль интерфейса с анимацией врагов загружен")
 end

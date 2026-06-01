@@ -58,6 +58,12 @@ if CLIENT then
     UT_BATTLE_CORE.attackSpacePressed = false
     UT_BATTLE_CORE.playerHp = 20
     UT_BATTLE_CORE.playerMaxHp = 20
+
+    UT_BATTLE_CORE.player_exp = UT_BATTLE_CORE.player_exp or 0
+    UT_BATTLE_CORE.player_gold = UT_BATTLE_CORE.player_gold or 0
+    UT_BATTLE_CORE.player_level = UT_BATTLE_CORE.player_level or 1
+    UT_BATTLE_CORE.player_attack = UT_BATTLE_CORE.player_attack or 10
+    UT_BATTLE_CORE.player_defense = UT_BATTLE_CORE.player_defense or 5
     UT_BATTLE_CORE.buttons = {
         { name = "FIGHT", normal = "undertale/attack.png", selected = "undertale/attack_use.png" },
         { name = "ACT", normal = "undertale/act.png", selected = "undertale/act_use.png" },

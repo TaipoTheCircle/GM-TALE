@@ -4,6 +4,33 @@ if CLIENT then
     
     UNDERTALE_CONFIG = UNDERTALE_CONFIG or {}
     
+
+-- ПИКСЕЛЬНЫЙ ШРИФТ (как в Undertale)
+    surface.CreateFont("UT_Pixel", {
+        font = "Courier New",  -- Можно заменить на "Press Start 2P" или "Determination Mono"
+        size = 24,
+        weight = 700,
+        antialias = false,  -- Отключаем сглаживание для пиксельного эффекта
+        additive = false,
+        extended = true
+    })
+    
+    surface.CreateFont("UT_Pixel_Small", {
+        font = "Courier New",
+        size = 18,
+        weight = 500,
+        antialias = false,
+        additive = false
+    })
+    
+    surface.CreateFont("UT_Pixel_Large", {
+        font = "Courier New",
+        size = 36,
+        weight = 900,
+        antialias = false,
+        additive = false
+    })
+
     -- КОНФИГУРАЦИЯ СЕТКИ ВРАГОВ
     UNDERTALE_CONFIG.ENEMY_GRID = {
         COLUMNS = 6,
