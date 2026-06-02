@@ -162,15 +162,24 @@ if CLIENT then
     end
     
     -- ====== ФУНКЦИЯ ДЛЯ ЖИВОГО ВРАГА ======
-    UT_BATTLE_HUD.DrawLargeEnemy = function(enemy, x, y, w, h)
-        local animData = UT_BATTLE_HUD.InitEnemyAnimation(enemy)
-        animData = UT_BATTLE_HUD.UpdateEnemyAnimation(enemy, animData)
-        
+   UT_BATTLE_HUD.DrawLargeEnemy = function(enemy, x, y, w, h)
         local isSelected = false
         if UT_BATTLE_CORE.selectedTarget and UT_BATTLE_CORE.currentTargets then
             local selectedEnemy = UT_BATTLE_CORE.currentTargets[UT_BATTLE_CORE.selectedTarget]
             isSelected = selectedEnemy == enemy
         end
+        
+        -- Используем новую систему частей
+        if UT_ENEMY_PARTS and UT_ENEMY_PARTS.DrawEnemyByParts then
+            UT_ENEMY_PARTS.DrawEnemyByParts(enemy, x, y, w, h, isSelected)
+        else
+            -- Fallback на старую отрисовку
+            UT_BATTLE_HUD.DrawLegacyEnemy(enemy, x, y, w, h, isSelected)
+        end
+    end
+    
+    -- Старая функция (переименуйте существующую DrawLargeEnemy в DrawLegacyEnemy)
+    UT_BATTLE_HUD.DrawLegacyEnemy = function(enemy, x, y, w, h, isSelected)
         
         local scaleX = animData.idleScale
         local scaleY = 1 + (1 - animData.idleScale) * 0.5
@@ -851,282 +860,299 @@ if CLIENT then
         end
     end
     
-    -- ====== СОЗДАНИЕ БОЕВОГО МЕНЮ ======
-    UT_BATTLE_HUD.CreateBattleMenu = function()
-        print("[UNDERTALE] Создание боевого меню с PNG фоном...")
+-- ====== СОЗДАНИЕ БОЕВОГО МЕНЮ ======
+UT_BATTLE_HUD.CreateBattleMenu = function()
+    print("[UNDERTALE] Создание боевого меню с PNG фоном...")
+    
+    if not UT_BATTLE_CORE then
+        print("[UNDERTALE] КРИТИЧЕСКАЯ ОШИБКА: UT_BATTLE_CORE не существует!")
+        chat.AddText(Color(255, 0, 0), "[ОШИБКА] ", Color(255, 255, 255), 
+            "Ядро боевой системы не загружено!")
+        return
+    end
+    
+    if UT_BATTLE_CORE.battleActive == nil then
+        UT_BATTLE_CORE.battleActive = false
+    end
+    
+    if UT_BATTLE_CORE.battleActive then
+        print("[UNDERTALE] Бой уже активен!")
+        return
+    end
+    
+    UT_BATTLE_CORE.battleActive = true
+    UT_BATTLE_CORE.selectedButton = 1
+    UT_BATTLE_CORE.selectedTarget = 1
+    UT_BATTLE_CORE.selectedAct = 1
+    UT_BATTLE_CORE.battleMode = "MENU"
+    UT_BATTLE_CORE.keyCooldown = 0
+    UT_BATTLE_CORE.btnImages = {}
+    UT_BATTLE_CORE.attackActive = false
+    UT_BATTLE_CORE.attackInProgress = false
+    UT_BATTLE_CORE.attackResult = nil
+    
+    if not UT_BATTLE_CORE.buttons then
+        UT_BATTLE_CORE.buttons = {
+            { name = "FIGHT", normal = "undertale/attack.png", selected = "undertale/attack_use.png" },
+            { name = "ACT", normal = "undertale/act.png", selected = "undertale/act_use.png" },
+            { name = "ITEM", normal = "undertale/item.png", selected = "undertale/item_use.png" },
+            { name = "MERCY", normal = "undertale/mercy.png", selected = "undertale/mercy_use.png" }
+        }
+    end
+    
+    if not UT_BATTLE_CORE.currentTargets or #UT_BATTLE_CORE.currentTargets == 0 then
+        UT_BATTLE_CORE.currentTargets = {
+            {name = "СОЛДАТ", hp = 30, maxhp = 30, class = "npc_combine_s"},
+            {name = "ЗОМБИ", hp = 25, maxhp = 25, class = "npc_zombie"},
+            {name = "АНТЛИОН", hp = 35, maxhp = 35, class = "npc_antlion_s"},
+            {name = "РАБОЧИЙ", hp = 20, maxhp = 20, class = "npc_antlionworker"}
+        }
+    end
+    
+    if IsValid(UT_BATTLE_CORE.battleFrame) then UT_BATTLE_CORE.battleFrame:Remove() end
+    
+    UT_BATTLE_CORE.battleFrame = vgui.Create("DFrame")
+    UT_BATTLE_CORE.battleFrame:SetSize(ScrW(), ScrH())
+    UT_BATTLE_CORE.battleFrame:SetPos(0, 0)
+    UT_BATTLE_CORE.battleFrame:SetTitle("")
+    UT_BATTLE_CORE.battleFrame:ShowCloseButton(false)
+    UT_BATTLE_CORE.battleFrame:SetDraggable(false)
+    UT_BATTLE_CORE.battleFrame:MakePopup()
+    UT_BATTLE_CORE.battleFrame:SetKeyboardInputEnabled(true)
+    
+    UT_BATTLE_CORE.battleFrame.Paint = function(self, w, h)
+        surface.SetDrawColor(0, 0, 0, 255)
+        surface.DrawRect(0, 0, w, h)
         
-        if not UT_BATTLE_CORE then
-            print("[UNDERTALE] КРИТИЧЕСКАЯ ОШИБКА: UT_BATTLE_CORE не существует!")
-            chat.AddText(Color(255, 0, 0), "[ОШИБКА] ", Color(255, 255, 255), 
-                "Ядро боевой системы не загружено!")
-            return
+        UT_BATTLE_HUD.DrawEnemiesOnGrid()
+        
+        -- Рисуем эффекты ПОВЕРХ врагов
+        if UT_DAMAGE_EFFECT and UT_DAMAGE_EFFECT.DrawEffectsOnPanel then
+            UT_DAMAGE_EFFECT.DrawEffectsOnPanel()
         end
         
-        if UT_BATTLE_CORE.battleActive == nil then
-            UT_BATTLE_CORE.battleActive = false
+        local dialogY = ScrH() * 0.55
+        surface.SetDrawColor(0, 0, 0, 180)
+        surface.DrawRect(0, dialogY - 50, w, h - dialogY + 50)
+        
+        for i = 0, 50 do
+            local alpha = 255 * (1 - i/50)
+            surface.SetDrawColor(0, 0, 0, alpha)
+            surface.DrawRect(0, i, w, 1)
         end
         
-        if UT_BATTLE_CORE.battleActive then
-            print("[UNDERTALE] Бой уже активен!")
-            return
+        draw.SimpleText("UNDERTALE BATTLE SYSTEM", "UT_Small", 20, 20, 
+            Color(0, 255, 0, 150))
+    end
+    
+    local dialogW = 900
+    local dialogH = 250
+    UT_BATTLE_CORE.dialogPanel = vgui.Create("DPanel", UT_BATTLE_CORE.battleFrame)
+    UT_BATTLE_CORE.dialogPanel:SetSize(dialogW, dialogH)
+    UT_BATTLE_CORE.dialogPanel:SetPos(ScrW()/2 - dialogW/2, ScrH() * 0.55)
+    
+    UT_BATTLE_HUD.UpdateDialogPanel()
+    
+    UT_BATTLE_CORE.btnPanel = vgui.Create("DPanel", UT_BATTLE_CORE.battleFrame)
+    UT_BATTLE_CORE.btnPanel:SetSize(ScrW(), 130)
+    UT_BATTLE_CORE.btnPanel:SetPos(0, ScrH() - 130)
+    UT_BATTLE_CORE.btnPanel.Paint = function() end
+    
+    -- Слой для эффектов поверх всего
+    UT_BATTLE_CORE.effectLayer = vgui.Create("DPanel", UT_BATTLE_CORE.battleFrame)
+    UT_BATTLE_CORE.effectLayer:SetSize(ScrW(), ScrH())
+    UT_BATTLE_CORE.effectLayer:SetPos(0, 0)
+    UT_BATTLE_CORE.effectLayer:SetZPos(100)
+    UT_BATTLE_CORE.effectLayer.Paint = function(self, w, h)
+        if UT_DAMAGE_EFFECT and UT_DAMAGE_EFFECT.DrawEffectsOnPanel then
+            UT_DAMAGE_EFFECT.DrawEffectsOnPanel()
         end
-        
-        UT_BATTLE_CORE.battleActive = true
-        UT_BATTLE_CORE.selectedButton = 1
-        UT_BATTLE_CORE.selectedTarget = 1
-        UT_BATTLE_CORE.selectedAct = 1
-        UT_BATTLE_CORE.battleMode = "MENU"
-        UT_BATTLE_CORE.keyCooldown = 0
-        UT_BATTLE_CORE.btnImages = {}
-        UT_BATTLE_CORE.attackActive = false
-        UT_BATTLE_CORE.attackInProgress = false
-        UT_BATTLE_CORE.attackResult = nil
-        
-        if not UT_BATTLE_CORE.buttons then
-            UT_BATTLE_CORE.buttons = {
-                { name = "FIGHT", normal = "undertale/attack.png", selected = "undertale/attack_use.png" },
-                { name = "ACT", normal = "undertale/act.png", selected = "undertale/act_use.png" },
-                { name = "ITEM", normal = "undertale/item.png", selected = "undertale/item_use.png" },
-                { name = "MERCY", normal = "undertale/mercy.png", selected = "undertale/mercy_use.png" }
-            }
+    end
+    
+    local totalBtnWidth = 0
+    local btnWidths = {}
+    
+    for i, data in ipairs(UT_BATTLE_CORE.buttons) do
+        if file.Exists("materials/"..data.normal, "GAME") then
+            local material = Material(data.normal)
+            if material and not material:IsError() then
+                local texWidth = material:Width() or 763
+                local texHeight = material:Height() or 273
+                local scale = 90 / texHeight
+                btnWidths[i] = texWidth * scale
+            else
+                btnWidths[i] = 180
+            end
+        else
+            btnWidths[i] = 180
         end
+        totalBtnWidth = totalBtnWidth + btnWidths[i]
+    end
+    
+    local totalSpacing = ScrW() - totalBtnWidth
+    local spacing = totalSpacing / (#UT_BATTLE_CORE.buttons + 1)
+    local currentX = spacing
+    
+    for i, data in ipairs(UT_BATTLE_CORE.buttons) do
+        local btnW = btnWidths[i]
+        local btnH = 90
+        local btnY = 20
         
-        if not UT_BATTLE_CORE.currentTargets or #UT_BATTLE_CORE.currentTargets == 0 then
-            UT_BATTLE_CORE.currentTargets = {
-                {name = "СОЛДАТ", hp = 30, maxhp = 30, class = "npc_combine_s"},
-                {name = "ЗОМБИ", hp = 25, maxhp = 25, class = "npc_zombie"},
-                {name = "АНТЛИОН", hp = 35, maxhp = 35, class = "npc_antlion_s"},
-                {name = "РАБОЧИЙ", hp = 20, maxhp = 20, class = "npc_antlionworker"}
-            }
-        end
+        local hasTexture = file.Exists("materials/"..data.normal, "GAME")
         
-        if IsValid(UT_BATTLE_CORE.battleFrame) then UT_BATTLE_CORE.battleFrame:Remove() end
-        
-        UT_BATTLE_CORE.battleFrame = vgui.Create("DFrame")
-        UT_BATTLE_CORE.battleFrame:SetSize(ScrW(), ScrH())
-        UT_BATTLE_CORE.battleFrame:SetPos(0, 0)
-        UT_BATTLE_CORE.battleFrame:SetTitle("")
-        UT_BATTLE_CORE.battleFrame:ShowCloseButton(false)
-        UT_BATTLE_CORE.battleFrame:SetDraggable(false)
-        UT_BATTLE_CORE.battleFrame:MakePopup()
-        UT_BATTLE_CORE.battleFrame:SetKeyboardInputEnabled(true)
-        
-        UT_BATTLE_CORE.battleFrame.Paint = function(self, w, h)
-            surface.SetDrawColor(0, 0, 0, 255)
-            surface.DrawRect(0, 0, w, h)
-            UT_BATTLE_HUD.DrawEnemiesOnGrid()
-            
-            local dialogY = ScrH() * 0.55
-            surface.SetDrawColor(0, 0, 0, 180)
-            surface.DrawRect(0, dialogY - 50, w, h - dialogY + 50)
-            
-            for i = 0, 50 do
-                local alpha = 255 * (1 - i/50)
-                surface.SetDrawColor(0, 0, 0, alpha)
-                surface.DrawRect(0, i, w, 1)
+        if hasTexture then
+            local btnContainer = vgui.Create("DPanel", UT_BATTLE_CORE.btnPanel)
+            btnContainer:SetSize(btnW, btnH)
+            btnContainer:SetPos(currentX, btnY)
+            btnContainer.Paint = function(self, w, h)
+                if UT_BATTLE_CORE.battleMode == "MENU" and UT_BATTLE_CORE.selectedButton == i then
+                    surface.SetDrawColor(255, 255, 0, 30)
+                    surface.DrawRect(0, 0, w, h)
+                    surface.SetDrawColor(255, 255, 0, 200)
+                    surface.DrawOutlinedRect(0, 0, w, h, 3)
+                end
             end
             
-            draw.SimpleText("UNDERTALE BATTLE SYSTEM", "UT_Small", 20, 20, 
-                Color(0, 255, 0, 150))
+            local btnImage = vgui.Create("DImage", btnContainer)
+            btnImage:SetSize(btnW, btnH)
+            btnImage:SetKeepAspect(true)
+            btnImage:SetImage(data.normal)
+            
+            UT_BATTLE_CORE.btnImages[i] = { image = btnImage, data = data }
+        else
+            local btnContainer = vgui.Create("DPanel", UT_BATTLE_CORE.btnPanel)
+            btnContainer:SetSize(btnW, btnH)
+            btnContainer:SetPos(currentX, btnY)
+            btnContainer.Paint = function() end
+            
+            local simpleBtn = vgui.Create("DButton", btnContainer)
+            simpleBtn:SetSize(btnW, btnH)
+            simpleBtn:SetPos(0, 0)
+            simpleBtn:SetText(data.name)
+            simpleBtn:SetFont("UT_Pixel")
+            simpleBtn.Paint = function(self, w, h)
+                surface.SetDrawColor(100, 100, 100, 200)
+                surface.DrawRect(0, 0, w, h)
+                
+                if UT_BATTLE_CORE.battleMode == "MENU" and UT_BATTLE_CORE.selectedButton == i then
+                    surface.SetDrawColor(255, 255, 0, 100)
+                    surface.DrawRect(0, 0, w, h)
+                end
+            end
+            
+            UT_BATTLE_CORE.btnImages[i] = { image = simpleBtn, data = data }
         end
         
-        local dialogW = 900
-        local dialogH = 250
-        UT_BATTLE_CORE.dialogPanel = vgui.Create("DPanel", UT_BATTLE_CORE.battleFrame)
-        UT_BATTLE_CORE.dialogPanel:SetSize(dialogW, dialogH)
-        UT_BATTLE_CORE.dialogPanel:SetPos(ScrW()/2 - dialogW/2, ScrH() * 0.55)
-        
-        UT_BATTLE_HUD.UpdateDialogPanel()
-        
-        UT_BATTLE_CORE.btnPanel = vgui.Create("DPanel", UT_BATTLE_CORE.battleFrame)
-        UT_BATTLE_CORE.btnPanel:SetSize(ScrW(), 130)
-        UT_BATTLE_CORE.btnPanel:SetPos(0, ScrH() - 130)
-        UT_BATTLE_CORE.btnPanel.Paint = function() end
-        
-        local totalBtnWidth = 0
-        local btnWidths = {}
-        
-        for i, data in ipairs(UT_BATTLE_CORE.buttons) do
-            if file.Exists("materials/"..data.normal, "GAME") then
-                local material = Material(data.normal)
+        currentX = currentX + btnW + spacing
+    end
+    
+    local fightBtnIndex = 1
+    local fightBtnX = 0
+    local fightBtnWidth = 0
+    
+    for i, data in ipairs(UT_BATTLE_CORE.buttons) do
+        if data.name == "FIGHT" then
+            fightBtnIndex = i
+            local totalBtnWidthRecalc = 0
+            local btnWidthsRecalc = {}
+            
+            for j, btnData in ipairs(UT_BATTLE_CORE.buttons) do
+                local material = Material(btnData.normal)
                 if material and not material:IsError() then
                     local texWidth = material:Width() or 763
                     local texHeight = material:Height() or 273
                     local scale = 90 / texHeight
-                    btnWidths[i] = texWidth * scale
+                    btnWidthsRecalc[j] = texWidth * scale
                 else
-                    btnWidths[i] = 180
+                    btnWidthsRecalc[j] = 180
                 end
-            else
-                btnWidths[i] = 180
-            end
-            totalBtnWidth = totalBtnWidth + btnWidths[i]
-        end
-        
-        local totalSpacing = ScrW() - totalBtnWidth
-        local spacing = totalSpacing / (#UT_BATTLE_CORE.buttons + 1)
-        local currentX = spacing
-        
-        for i, data in ipairs(UT_BATTLE_CORE.buttons) do
-            local btnW = btnWidths[i]
-            local btnH = 90
-            local btnY = 20
-            
-            local hasTexture = file.Exists("materials/"..data.normal, "GAME")
-            
-            if hasTexture then
-                local btnContainer = vgui.Create("DPanel", UT_BATTLE_CORE.btnPanel)
-                btnContainer:SetSize(btnW, btnH)
-                btnContainer:SetPos(currentX, btnY)
-                btnContainer.Paint = function(self, w, h)
-                    if UT_BATTLE_CORE.battleMode == "MENU" and UT_BATTLE_CORE.selectedButton == i then
-                        surface.SetDrawColor(255, 255, 0, 30)
-                        surface.DrawRect(0, 0, w, h)
-                        surface.SetDrawColor(255, 255, 0, 200)
-                        surface.DrawOutlinedRect(0, 0, w, h, 3)
-                    end
-                end
-                
-                local btnImage = vgui.Create("DImage", btnContainer)
-                btnImage:SetSize(btnW, btnH)
-                btnImage:SetKeepAspect(true)
-                btnImage:SetImage(data.normal)
-                
-                UT_BATTLE_CORE.btnImages[i] = { image = btnImage, data = data }
-            else
-                local btnContainer = vgui.Create("DPanel", UT_BATTLE_CORE.btnPanel)
-                btnContainer:SetSize(btnW, btnH)
-                btnContainer:SetPos(currentX, btnY)
-                btnContainer.Paint = function() end
-                
-                local simpleBtn = vgui.Create("DButton", btnContainer)
-                simpleBtn:SetSize(btnW, btnH)
-                simpleBtn:SetPos(0, 0)
-                simpleBtn:SetText(data.name)
-                simpleBtn:SetFont("UT_Pixel")
-                simpleBtn.Paint = function(self, w, h)
-                    surface.SetDrawColor(100, 100, 100, 200)
-                    surface.DrawRect(0, 0, w, h)
-                    
-                    if UT_BATTLE_CORE.battleMode == "MENU" and UT_BATTLE_CORE.selectedButton == i then
-                        surface.SetDrawColor(255, 255, 0, 100)
-                        surface.DrawRect(0, 0, w, h)
-                    end
-                end
-                
-                UT_BATTLE_CORE.btnImages[i] = { image = simpleBtn, data = data }
+                totalBtnWidthRecalc = totalBtnWidthRecalc + btnWidthsRecalc[j]
             end
             
-            currentX = currentX + btnW + spacing
-        end
-        
-        local fightBtnIndex = 1
-        local fightBtnX = 0
-        local fightBtnWidth = 0
-        
-        for i, data in ipairs(UT_BATTLE_CORE.buttons) do
-            if data.name == "FIGHT" then
-                fightBtnIndex = i
-                local totalBtnWidthRecalc = 0
-                local btnWidthsRecalc = {}
-                
-                for j, btnData in ipairs(UT_BATTLE_CORE.buttons) do
-                    local material = Material(btnData.normal)
-                    if material and not material:IsError() then
-                        local texWidth = material:Width() or 763
-                        local texHeight = material:Height() or 273
-                        local scale = 90 / texHeight
-                        btnWidthsRecalc[j] = texWidth * scale
-                    else
-                        btnWidthsRecalc[j] = 180
-                    end
-                    totalBtnWidthRecalc = totalBtnWidthRecalc + btnWidthsRecalc[j]
-                end
-                
-                local totalSpacingRecalc = ScrW() - totalBtnWidthRecalc
-                local spacingRecalc = totalSpacingRecalc / (#UT_BATTLE_CORE.buttons + 1)
-                
-                fightBtnWidth = btnWidthsRecalc[fightBtnIndex]
-                fightBtnX = spacingRecalc
-                for j = 1, fightBtnIndex-1 do
-                    fightBtnX = fightBtnX + btnWidthsRecalc[j] + spacingRecalc
-                end
-                break
+            local totalSpacingRecalc = ScrW() - totalBtnWidthRecalc
+            local spacingRecalc = totalSpacingRecalc / (#UT_BATTLE_CORE.buttons + 1)
+            
+            fightBtnWidth = btnWidthsRecalc[fightBtnIndex]
+            fightBtnX = spacingRecalc
+            for j = 1, fightBtnIndex-1 do
+                fightBtnX = fightBtnX + btnWidthsRecalc[j] + spacingRecalc
             end
+            break
         end
-        
-        UT_BATTLE_CORE.infoPanel = vgui.Create("DPanel", UT_BATTLE_CORE.battleFrame)
-        local infoWidth = fightBtnWidth + 40
-        local infoHeight = 60
-        local infoX = fightBtnX - 20
-        local infoY = ScrH() - 130 - infoHeight - 10
-        
-        UT_BATTLE_CORE.infoPanel:SetSize(infoWidth, infoHeight)
-        UT_BATTLE_CORE.infoPanel:SetPos(infoX, infoY)
-        
-        UT_BATTLE_CORE.infoPanel.Paint = function(self, w, h)
-            surface.SetDrawColor(0, 0, 0, 200)
-            surface.DrawRect(0, 0, w, h)
-            surface.SetDrawColor(255, 255, 255, 100)
-            surface.DrawOutlinedRect(0, 0, w, h, 1)
-            
-            local playerName = "ИГРОК"
-            if IsValid(LocalPlayer()) then
-                playerName = LocalPlayer():Nick() or "ИГРОК"
-            end
-            
-            draw.SimpleText(playerName.."  LV 1", "UT_PlayerName", 
-                w/2, 10, Color(255, 255, 255), TEXT_ALIGN_CENTER)
-            
-            draw.SimpleText("HP:", "UT_Small", 10, 35, Color(255, 255, 255))
-            
-            local hpPercent = (UT_BATTLE_CORE.playerHp or 20) / (UT_BATTLE_CORE.playerMaxHp or 20)
-            local hpBarWidth = w - 80
-            local hpBarHeight = 15
-            local hpBarX = 40
-            local hpBarY = 33
-            
-            surface.SetDrawColor(50, 50, 50, 255)
-            surface.DrawRect(hpBarX, hpBarY, hpBarWidth, hpBarHeight)
-            
-            local currentHpWidth = hpBarWidth * hpPercent
-            
-            if hpPercent > 0.5 then
-                surface.SetDrawColor(255, 255, 0, 255)
-            elseif hpPercent > 0.2 then
-                surface.SetDrawColor(255, 165, 0, 255)
-            else
-                surface.SetDrawColor(255, 50, 0, 255)
-            end
-            
-            surface.DrawRect(hpBarX, hpBarY, currentHpWidth, hpBarHeight)
-            
-            surface.SetDrawColor(255, 255, 255, 100)
-            surface.DrawOutlinedRect(hpBarX, hpBarY, hpBarWidth, hpBarHeight, 2)
-            
-            draw.SimpleText((UT_BATTLE_CORE.playerHp or 20).." / "..(UT_BATTLE_CORE.playerMaxHp or 20), "UT_Small", 
-                hpBarX + hpBarWidth + 5, 35, Color(255, 255, 255))
-        end
-        
-        if UT_BATTLE_CORE.UpdateButtonImages then
-            UT_BATTLE_CORE.UpdateButtonImages()
-        end
-        
-        UT_BATTLE_CORE.battleFrame.OnKeyCodePressed = function(self, key)
-            if UT_BATTLE_INPUT and UT_BATTLE_INPUT.HandleKeyPress then
-                UT_BATTLE_INPUT.HandleKeyPress(key)
-            end
-        end
-        
-        if UT_BATTLE_INPUT and UT_BATTLE_INPUT.SetupInputHook then
-            UT_BATTLE_INPUT.SetupInputHook()
-        end
-        
-        print("[UNDERTALE] Боевое меню с PNG фоном создано!")
-        chat.AddText(Color(0, 255, 0), "[UNDERTALE] ", Color(255, 255, 255), "Бой начат!")
-        chat.AddText(Color(255, 255, 0), "[ПОДСКАЗКА] ", Color(255, 255, 255), 
-            "← → для выбора действия, ↑ ↓ для выбора цели/действия, ENTER для подтверждения")
     end
+    
+    UT_BATTLE_CORE.infoPanel = vgui.Create("DPanel", UT_BATTLE_CORE.battleFrame)
+    local infoWidth = fightBtnWidth + 40
+    local infoHeight = 60
+    local infoX = fightBtnX - 20
+    local infoY = ScrH() - 130 - infoHeight - 10
+    
+    UT_BATTLE_CORE.infoPanel:SetSize(infoWidth, infoHeight)
+    UT_BATTLE_CORE.infoPanel:SetPos(infoX, infoY)
+    
+    UT_BATTLE_CORE.infoPanel.Paint = function(self, w, h)
+        surface.SetDrawColor(0, 0, 0, 200)
+        surface.DrawRect(0, 0, w, h)
+        surface.SetDrawColor(255, 255, 255, 100)
+        surface.DrawOutlinedRect(0, 0, w, h, 1)
+        
+        local playerName = "ИГРОК"
+        if IsValid(LocalPlayer()) then
+            playerName = LocalPlayer():Nick() or "ИГРОК"
+        end
+        
+        draw.SimpleText(playerName.."  LV 1", "UT_PlayerName", 
+            w/2, 10, Color(255, 255, 255), TEXT_ALIGN_CENTER)
+        
+        draw.SimpleText("HP:", "UT_Small", 10, 35, Color(255, 255, 255))
+        
+        local hpPercent = (UT_BATTLE_CORE.playerHp or 20) / (UT_BATTLE_CORE.playerMaxHp or 20)
+        local hpBarWidth = w - 80
+        local hpBarHeight = 15
+        local hpBarX = 40
+        local hpBarY = 33
+        
+        surface.SetDrawColor(50, 50, 50, 255)
+        surface.DrawRect(hpBarX, hpBarY, hpBarWidth, hpBarHeight)
+        
+        local currentHpWidth = hpBarWidth * hpPercent
+        
+        if hpPercent > 0.5 then
+            surface.SetDrawColor(255, 255, 0, 255)
+        elseif hpPercent > 0.2 then
+            surface.SetDrawColor(255, 165, 0, 255)
+        else
+            surface.SetDrawColor(255, 50, 0, 255)
+        end
+        
+        surface.DrawRect(hpBarX, hpBarY, currentHpWidth, hpBarHeight)
+        
+        surface.SetDrawColor(255, 255, 255, 100)
+        surface.DrawOutlinedRect(hpBarX, hpBarY, hpBarWidth, hpBarHeight, 2)
+        
+        draw.SimpleText((UT_BATTLE_CORE.playerHp or 20).." / "..(UT_BATTLE_CORE.playerMaxHp or 20), "UT_Small", 
+            hpBarX + hpBarWidth + 5, 35, Color(255, 255, 255))
+    end
+    
+    if UT_BATTLE_CORE.UpdateButtonImages then
+        UT_BATTLE_CORE.UpdateButtonImages()
+    end
+    
+    UT_BATTLE_CORE.battleFrame.OnKeyCodePressed = function(self, key)
+        if UT_BATTLE_INPUT and UT_BATTLE_INPUT.HandleKeyPress then
+            UT_BATTLE_INPUT.HandleKeyPress(key)
+        end
+    end
+    
+    if UT_BATTLE_INPUT and UT_BATTLE_INPUT.SetupInputHook then
+        UT_BATTLE_INPUT.SetupInputHook()
+    end
+    
+    print("[UNDERTALE] Боевое меню с PNG фоном создано!")
+    chat.AddText(Color(0, 255, 0), "[UNDERTALE] ", Color(255, 255, 255), "Бой начат!")
+    chat.AddText(Color(255, 255, 0), "[ПОДСКАЗКА] ", Color(255, 255, 255), 
+        "← → для выбора действия, ↑ ↓ для выбора цели/действия, ENTER для подтверждения")
+end
     
     -- ВОССТАНОВЛЕНИЕ ПАНЕЛИ ПОСЛЕ СЕРДЦА
     UT_BATTLE_HUD.RestorePanel = function()
@@ -1138,6 +1164,41 @@ if CLIENT then
         end
     end
     
+    -- Получить позицию врага на экране
+    function UT_BATTLE_HUD.GetEnemyPosition(enemy)
+        if not enemy then return ScrW()/2 - 110, ScrH() * 0.2, 220, 270 end
+        
+        local enemies = UT_BATTLE_CORE.currentTargets
+        local enemyCount = #enemies
+        
+        local enemyIndex = 1
+        for i, e in ipairs(enemies) do
+            if e == enemy then
+                enemyIndex = i
+                break
+            end
+        end
+        
+        local gridY = ScrH() * 0.03
+        local gridH = 580
+        
+        if enemyCount == 1 then
+            return ScrW()/2 - 250, gridY + gridH/2 - 200 - 50, 500, 400
+        elseif enemyCount == 2 then
+            local spacing = 200
+            if enemyIndex == 1 then
+                return ScrW()/2 - 450 - spacing/2, gridY + gridH/2 - 190 - 40, 450, 380
+            else
+                return ScrW()/2 + spacing/2, gridY + gridH/2 - 190 - 40, 450, 380
+            end
+        else
+            local enemyWidth = 220
+            local totalWidth = enemyWidth * enemyCount + 100 * (enemyCount - 1)
+            local startX = ScrW()/2 - totalWidth/2
+            return startX + (enemyIndex - 1) * (enemyWidth + 100), gridY + 330, 220, 270
+        end
+    end
+
     -- Показ числа урона
     function UT_BATTLE_HUD.ShowDamageNumber(damage, is_critical)
         if not IsValid(UT_BATTLE_CORE.dialogPanel) then return end

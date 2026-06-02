@@ -176,6 +176,128 @@ if CLIENT then
             end)
         end)
         
+-- Команда для проверки спрайтов удара
+concommand.Add("ut_test_slash", function()
+    print("[UNDERTALE] ===== ТЕСТ СПРАЙТОВ УДАРА =====")
+    
+    -- 1. Проверяем наличие файлов
+    local slashFiles = {
+        "materials/undertale/slash1.png",
+        "materials/undertale/slash2.png",
+        "materials/undertale/slash3.png",
+        "materials/undertale/slash4.png",
+        "materials/undertale/slash5.png",
+        "materials/undertale/slash6.png"
+    }
+    
+    local foundCount = 0
+    print("\nПроверка файлов:")
+    for i, filePath in ipairs(slashFiles) do
+        if file.Exists(filePath, "GAME") then
+            print("  ✅ " .. filePath .. " - НАЙДЕН")
+            foundCount = foundCount + 1
+        else
+            print("  ❌ " .. filePath .. " - НЕ НАЙДЕН")
+        end
+    end
+    
+    print("\nНайдено файлов: " .. foundCount .. "/6")
+    
+    -- 2. Проверяем загружены ли материалы
+    if UT_DAMAGE_EFFECT and UT_DAMAGE_EFFECT.slashMaterials then
+        print("\nПроверка загруженных материалов:")
+        local loadedCount = 0
+        for i, mat in ipairs(UT_DAMAGE_EFFECT.slashMaterials) do
+            if mat and not mat:IsError() then
+                print("  ✅ Спрайт " .. i .. " загружен")
+                loadedCount = loadedCount + 1
+            else
+                print("  ❌ Спрайт " .. i .. " НЕ загружен (ошибка материала)")
+            end
+        end
+        print("Загружено материалов: " .. loadedCount .. "/6")
+    else
+        print("\n❌ UT_DAMAGE_EFFECT.slashMaterials не существует!")
+    end
+    
+    -- 3. Тестовый эффект удара в центре экрана
+    if UT_DAMAGE_EFFECT and UT_DAMAGE_EFFECT.AddHitEffect then
+        print("\nЗапуск тестового эффекта удара...")
+        
+        -- Создаём тестовый эффект в центре экрана
+        local screenW = ScrW()
+        local screenH = ScrH()
+        local testX = screenW/2 - 150
+        local testY = screenH/2 - 150
+        local testW = 300
+        local testH = 300
+        
+        UT_DAMAGE_EFFECT.AddHitEffect(testX, testY, testW, testH, true)
+        chat.AddText(Color(0, 255, 0), "[ТЕСТ] ", Color(255, 255, 255), 
+            "Тестовый эффект удара в центре экрана!")
+        chat.AddText(Color(255, 255, 0), "[РЕЗУЛЬТАТ] ", Color(255, 255, 255), 
+            "Найдено спрайтов: " .. foundCount .. "/6")
+    else
+        print("❌ UT_DAMAGE_EFFECT.AddHitEffect не существует!")
+        chat.AddText(Color(255, 0, 0), "[ОШИБКА] ", Color(255, 255, 255), 
+            "Система эффектов не загружена!")
+    end
+    
+    print("\n================================")
+end)
+
+-- Команда для теста вспышки (без спрайтов)
+concommand.Add("ut_test_flash", function()
+    if UT_DAMAGE_EFFECT and UT_DAMAGE_EFFECT.AddFlashEffect then
+        local screenW = ScrW()
+        local screenH = ScrH()
+        local testX = screenW/2 - 150
+        local testY = screenH/2 - 150
+        local testW = 300
+        local testH = 300
+        
+        UT_DAMAGE_EFFECT.AddFlashEffect(testX, testY, testW, testH, true)
+        chat.AddText(Color(0, 255, 0), "[ТЕСТ] ", Color(255, 255, 255), 
+            "Тестовая вспышка! (должна быть красная)")
+    else
+        chat.AddText(Color(255, 0, 0), "[ОШИБКА] ", Color(255, 255, 255), 
+            "Система эффектов не загружена!")
+    end
+end)
+
+-- Команда для принудительной загрузки спрайтов (если файлы есть)
+concommand.Add("ut_reload_slash", function()
+    if UT_DAMAGE_EFFECT then
+        print("[UNDERTALE] Принудительная перезагрузка спрайтов удара...")
+        
+        UT_DAMAGE_EFFECT.slashMaterials = {}
+        local loadedCount = 0
+        
+        for i, sprite in ipairs(UT_DAMAGE_EFFECT.slashSprites or {}) do
+            if file.Exists("materials/" .. sprite.name, "GAME") then
+                local mat = Material(sprite.name)
+                if mat and not mat:IsError() then
+                    UT_DAMAGE_EFFECT.slashMaterials[i] = mat
+                    loadedCount = loadedCount + 1
+                    print("  ✅ Загружен: " .. sprite.name)
+                else
+                    print("  ❌ Ошибка: " .. sprite.name)
+                end
+            else
+                print("  ❌ Не найден: " .. sprite.name)
+            end
+        end
+        
+        chat.AddText(Color(0, 255, 0), "[СПРАЙТЫ] ", Color(255, 255, 255), 
+            "Загружено спрайтов: " .. loadedCount .. "/6")
+        
+        if loadedCount == 0 then
+            chat.AddText(Color(255, 255, 0), "[ПРЕДУПРЕЖДЕНИЕ] ", Color(255, 255, 255), 
+                "Спрайты не найдены! Будет использована резервная отрисовка.")
+        end
+    end
+end)
+
         -- АВТОСООБЩЕНИЕ
         timer.Simple(5, function()
             print("========================================")

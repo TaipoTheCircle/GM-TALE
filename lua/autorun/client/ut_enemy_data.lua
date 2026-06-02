@@ -42,6 +42,32 @@ if CLIENT then
             heart_color = "BLUE"
         },
         
+        -- Кляйнер (Санс)
+        npc_kleiner = {
+            name = "КЛЯЙНЕР",
+            hp = 1,
+            maxhp = 1,
+            attack = 999,  -- Игнорируется, используется карма
+            defense = 0,
+            exp = 0,
+            gold = 0,
+            isSans = true,  -- Специальный флаг
+            
+            check_text = "* КЛЯЙНЕР - HP: 1, ATK: 1, DEF: 1\n* Самый Лёгкий Враг.",
+            
+            acts = {
+                { name = "ПРОВЕРИТЬ", text = "* Кляйнер улыбается.", info = true },
+                { name = "ПОГОВОРИТЬ", text = "* ...\n* Кляйнер молчит." },
+                { name = "ПОЖАЛЕТЬ", text = "* ...\n* Но ничего не произошло." }
+            },
+            
+            mercy_text = "* Кляйнер исчезает в вспышке света...",
+            heart_color = "BLUE",
+            
+            -- Используем специальную битву
+            specialBattle = "SANS"
+        },
+
         npc_antlion = {
             name = "МУРАВЬИНЫЙ ЛЕВ",
             hp = 45,

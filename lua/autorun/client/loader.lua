@@ -29,6 +29,10 @@ include("ut_battle_core.lua")
 AddCSLuaFile("ut_heart_simple.lua")
 include("ut_heart_simple.lua")
 
+-- 4.5. Система разных цветов души (НОВЫЙ)
+AddCSLuaFile("ut_heart_system.lua")
+include("ut_heart_system.lua")
+
 -- 5. Интерфейс с сеткой (обновленный)
 AddCSLuaFile("ut_battle_hud.lua")
 include("ut_battle_hud.lua")
@@ -48,6 +52,18 @@ include("ut_enemy_attacks.lua")
 -- 6.7. Система печатания текста (НОВЫЙ)
 AddCSLuaFile("ut_typing.lua")
 include("ut_typing.lua")
+
+-- 6.8. Система частей врагов (НОВЫЙ)
+AddCSLuaFile("ut_enemy_parts.lua")
+include("ut_enemy_parts.lua")
+
+-- 6.9. Система эффектов урона (НОВЫЙ)
+AddCSLuaFile("ut_damage_effect.lua")
+include("ut_damage_effect.lua")
+
+-- 6.10. Битва с Сансом (НОВЫЙ)
+AddCSLuaFile("ut_sans_battle.lua")
+include("ut_sans_battle.lua")
 
 -- 7. Музыка
 AddCSLuaFile("ut_battle_music.lua")
