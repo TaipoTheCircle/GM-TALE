@@ -210,6 +210,37 @@ if CLIENT then
             { type = "Homing", count = 6, speed = 200, damage = 2, homingStrength = 2, color = Color(255, 50, 255) }
         }
     end
+
+        -- ===== ПОКАЗАТЬ ДИАЛОГ =====
+    function UT_NIHILANTH_BATTLE.ShowDialog(lines, onComplete)
+        if not lines or #lines == 0 then
+            if onComplete then onComplete() end
+            return
+        end
+        
+        local lineIndex = 1
+        
+        local function ShowNextLine()
+            if lineIndex > #lines then
+                if onComplete then onComplete() end
+                return
+            end
+            
+            if UT_BATTLE_HUD and UT_BATTLE_HUD.ShowTypingDialogText then
+                UT_BATTLE_HUD.ShowTypingDialogText(lines[lineIndex], UT_BATTLE_CORE.dialogPanel, function()
+                    lineIndex = lineIndex + 1
+                    timer.Simple(0.8, ShowNextLine)
+                end)
+            else
+                -- Fallback, если функции нет
+                chat.AddText(Color(255, 255, 255), lines[lineIndex])
+                lineIndex = lineIndex + 1
+                timer.Simple(1.5, ShowNextLine)
+            end
+        end
+        
+        ShowNextLine()
+    end
     
 function UT_NIHILANTH_BATTLE.Start()
         print("[UNDERTALE] Запуск битвы с Нихилантом!")

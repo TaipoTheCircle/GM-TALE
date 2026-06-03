@@ -117,6 +117,11 @@ include("ut_attack_manager.lua")
 AddCSLuaFile("ut_nihilanth_battle.lua")
 include("ut_nihilanth_battle.lua")
 
+-- 99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999. R#UHW*F#W)OSDF
+AddCSLuaFile("ut_nobody_came.lua")
+include("ut_nobody_came.lua")
+
+
 -- Автосообщение
 timer.Simple(10, function()
     chat.AddText(Color(0, 255, 255), "[UNDERTALE] ", Color(255, 255, 255), 
