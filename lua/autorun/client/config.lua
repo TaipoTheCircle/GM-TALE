@@ -309,3 +309,54 @@ if CLIENT then
     
     print("[UNDERTALE] Конфигурация системы загружена")
 end
+
+-- Добавьте в config.lua
+
+-- Создаем шрифты как в Undertale
+surface.CreateFont("UT_Interface_HP", {
+    font = "Determination Mono",  -- или "Courier New", "Press Start 2P"
+    size = 24,
+    weight = 700,
+    antialias = false,  -- Важно для пиксельного эффекта!
+    additive = false,
+    extended = true
+})
+
+surface.CreateFont("UT_Interface_NAME", {
+    font = "Determination Mono",
+    size = 28,
+    weight = 900,
+    antialias = false
+})
+
+surface.CreateFont("UT_Interface_LV", {
+    font = "Determination Mono",
+    size = 20,
+    weight = 500,
+    antialias = false
+})
+
+-- Настройки интерфейса
+UNDERTALE_CONFIG.INTERFACE = {
+    HP_BAR = {
+        WIDTH = 150,
+        HEIGHT = 20,
+        X_OFFSET = 20,    -- отступ слева
+        Y_OFFSET = 20,    -- отступ сверху
+        COLOR = Color(255, 0, 0, 255),
+        BG_COLOR = Color(0, 0, 0, 180),
+        BORDER_COLOR = Color(255, 255, 255, 100)
+    },
+    
+    NAME = {
+        X_OFFSET = 20,
+        Y_OFFSET = 10,
+        COLOR = Color(255, 255, 255, 255)
+    },
+    
+    LV = {
+        X_OFFSET = 20,
+        Y_OFFSET = 50,
+        COLOR = Color(255, 255, 0, 255)
+    }
+}

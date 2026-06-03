@@ -34,6 +34,10 @@ if CLIENT then
     
     -- Модуль ядра боевой системы (основной)
     UT_BATTLE_CORE = UT_BATTLE_CORE or {}
+
+    UT_BATTLE_CORE.playerLV   = UT_BATTLE_CORE.playerLV   or 1
+UT_BATTLE_CORE.playerEXP  = UT_BATTLE_CORE.playerEXP  or 0
+UT_BATTLE_CORE.nextLVExp  = UT_BATTLE_CORE.nextLVExp  or 100
     
     -- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
     UT_BATTLE_CORE.battleActive = false
@@ -580,6 +584,7 @@ if UT_HEART_CORE.player.is_alive then
             UT_BATTLE_CORE.dialogPanel:SetPos(ScrW()/2 - 450, ScrH() * 0.55)
         end
         
+        
         timer.Simple(3, function()
             UT_BATTLE_CORE.StopAllSystems()
             
@@ -592,6 +597,17 @@ if UT_HEART_CORE.player.is_alive then
             end
         end)
     end
+    if player_won then
+    -- пример: даём 20 EXP за бой
+    UT_BATTLE_CORE.playerEXP = (UT_BATTLE_CORE.playerEXP or 0) + 20
+    if UT_BATTLE_CORE.playerEXP >= UT_BATTLE_CORE.nextLVExp then
+        UT_BATTLE_CORE.playerLV = (UT_BATTLE_CORE.playerLV or 1) + 1
+        UT_BATTLE_CORE.playerEXP = UT_BATTLE_CORE.playerEXP - UT_BATTLE_CORE.nextLVExp
+        UT_BATTLE_CORE.nextLVExp = UT_BATTLE_CORE.nextLVExp + 20  -- как в Undertale
+        chat.AddText(Color(255, 255, 0), "[УРОВЕНЬ] ", Color(255, 255, 255), 
+            "Ваш LV повышен до " .. UT_BATTLE_CORE.playerLV .. "!")
+    end
+end 
     
     function UT_BATTLE_CORE.StopAllSystems()
         print("[UNDERTALE] Полная остановка всех систем боя")

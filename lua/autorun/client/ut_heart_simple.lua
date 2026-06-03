@@ -379,6 +379,95 @@ if CLIENT then
     UT_HEART_CORE.StopHeartPhase = function()
         UT_HEART_SIMPLE.Stop()
     end
+
+    -- Добавьте в файл ut_heart_simple.lua после существующего кода:
+
+-- Система инвентаря (как в Undertale)
+UT_HEART_SIMPLE.inventory = {
+    items = {},
+    selectedItem = 1,
+    
+    UseItem = function(itemId)
+        local item = UT_HEART_SIMPLE.inventory.items[itemId]
+        if item then
+            if item.type == "heal" then
+                UT_HEART_SIMPLE.player_hp = math.min(20, UT_HEART_SIMPLE.player_hp + item.healAmount)
+                table.remove(UT_HEART_SIMPLE.inventory.items, itemId)
+                return true
+            elseif item.type == "weapon" then
+                UT_BATTLE_CORE.player_attack = item.attackBonus
+                return true
+            end
+        end
+        return false
+    end
+}
+
+-- Добавить предметы в инвентарь
+function UT_HEART_SIMPLE.AddItem(item)
+    table.insert(UT_HEART_SIMPLE.inventory.items, item)
+end
+
+-- Система ACT (действия как в Undertale)
+UT_HEART_SIMPLE.acts = {
+    check = function(enemy)
+        return "* " .. enemy.name .. " - ATK " .. (enemy.attack or 5) .. " DEF " .. (enemy.defense or 2)
+    end,
+    
+    talk = function(enemy)
+        local responses = {
+            "* ...",
+            "* " .. enemy.name .. " смотрит на вас",
+            "* Вы чувствуете, что враг становится слабее"
+        }
+        return responses[math.random(#responses)]
+    end,
+    
+    flirt = function(enemy)
+        if enemy.canFlirt then
+            enemy.mercy = (enemy.mercy or 0) + 20
+            return "* Вы флиртуете с " .. enemy.name .. "!\n* " .. enemy.name .. " смущён!"
+        end
+        return "* Ничего не произошло"
+    end
+}
+
+-- Система пощады (MERCY)
+UT_HEART_SIMPLE.mercyMeter = 0
+UT_HEART_SIMPLE.canSpare = false
+
+function UT_HEART_SIMPLE.UpdateMercy(amount)
+    UT_HEART_SIMPLE.mercyMeter = math.min(100, UT_HEART_SIMPLE.mercyMeter + amount)
+    if UT_HEART_SIMPLE.mercyMeter >= 100 then
+        UT_HEART_SIMPLE.canSpare = true
+    end
+end
+
+function UT_HEART_SIMPLE.SpareEnemy()
+    if UT_HEART_SIMPLE.canSpare then
+        -- Пощадить врага
+        return true
+    end
+    return false
+end
+
+-- Анимация смены цвета души
+UT_HEART_SIMPLE.heartColor = "RED"
+UT_HEART_SIMPLE.colorChangeTimer = 0
+
+function UT_HEART_SIMPLE.ChangeSoulColor(newColor, duration)
+    UT_HEART_SIMPLE.heartColor = newColor
+    UT_HEART_SIMPLE.colorChangeTimer = duration or 5
+    
+    -- Изменение механик в зависимости от цвета
+    if newColor == "BLUE" then
+        -- Только прыжки
+        UT_HEART_SIMPLE.blueMode = true
+    elseif newColor == "GREEN" then
+        -- Защитная стойка
+        UT_HEART_SIMPLE.greenMode = true
+    end
+end
     
     print("[UNDERTALE] Простая система сердца загружена (мерцание пропаданием спрайта)")
 end

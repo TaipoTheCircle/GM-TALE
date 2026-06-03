@@ -93,8 +93,17 @@ include("ut_battle_action.lua")
 AddCSLuaFile("ut_fixes.lua")
 include("ut_fixes.lua")
 
+-- 14. Загрузка новых систем
+AddCSLuaFile("ut_bullet_hell.lua")
+include("ut_bullet_hell.lua")
 
+-- 15. Система сохранения (как в Undertale)
+AddCSLuaFile("ut_save_system.lua")
+include("ut_save_system.lua")
 
+-- 16. Интерфейс игрока
+AddCSLuaFile("ut_theme.lua")
+include("ut_theme.lua")
 
 -- Автосообщение
 timer.Simple(10, function()

@@ -1081,57 +1081,76 @@ UT_BATTLE_HUD.CreateBattleMenu = function()
         end
     end
     
+          -- ====== СОЗДАНИЕ ИНФОРМАЦИОННОЙ ПАНЕЛИ ======
     UT_BATTLE_CORE.infoPanel = vgui.Create("DPanel", UT_BATTLE_CORE.battleFrame)
-    local infoWidth = fightBtnWidth + 40
-    local infoHeight = 60
-    local infoX = fightBtnX - 20
-    local infoY = ScrH() - 130 - infoHeight - 10
+    
+    local infoWidth = ScrW()
+    local infoHeight = 55
+    local infoX = 0
+    local infoY = ScrH() - 130 - 55 - 5
     
     UT_BATTLE_CORE.infoPanel:SetSize(infoWidth, infoHeight)
     UT_BATTLE_CORE.infoPanel:SetPos(infoX, infoY)
     
     UT_BATTLE_CORE.infoPanel.Paint = function(self, w, h)
+        -- ТОЛЬКО ФОН (без обводки!)
         surface.SetDrawColor(0, 0, 0, 200)
         surface.DrawRect(0, 0, w, h)
-        surface.SetDrawColor(255, 255, 255, 100)
-        surface.DrawOutlinedRect(0, 0, w, h, 1)
         
+        -- ДАННЫЕ
         local playerName = "ИГРОК"
         if IsValid(LocalPlayer()) then
-            playerName = LocalPlayer():Nick() or "ИГРОК"
+            playerName = string.upper(LocalPlayer():Nick())
         end
         
-        draw.SimpleText(playerName.."  LV 1", "UT_PlayerName", 
-            w/2, 10, Color(255, 255, 255), TEXT_ALIGN_CENTER)
+        local lv = UT_BATTLE_CORE.playerLV or 1
+        local hp = math.max(0, UT_BATTLE_CORE.playerHp or 20)
+        local maxHp = UT_BATTLE_CORE.playerMaxHp or 20
         
-        draw.SimpleText("HP:", "UT_Small", 10, 35, Color(255, 255, 255))
+        -- ===== ИМЯ с LV (сдвинуто вправо) =====
+        local leftOffset = 150
         
-        local hpPercent = (UT_BATTLE_CORE.playerHp or 20) / (UT_BATTLE_CORE.playerMaxHp or 20)
-        local hpBarWidth = w - 80
-        local hpBarHeight = 15
-        local hpBarX = 40
-        local hpBarY = 33
+        draw.SimpleText(playerName, "UT_Attack",
+            leftOffset, h/2,
+            Color(255, 255, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
         
-        surface.SetDrawColor(50, 50, 50, 255)
-        surface.DrawRect(hpBarX, hpBarY, hpBarWidth, hpBarHeight)
+        surface.SetFont("UT_Attack")
+        local nameWidth = surface.GetTextSize(playerName)
         
-        local currentHpWidth = hpBarWidth * hpPercent
+        local lvX = leftOffset + nameWidth + 20
+        draw.SimpleText("LV", "UT_Attack", lvX, h/2, Color(200, 200, 200), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        draw.SimpleText(tostring(lv), "UT_Attack", lvX + 45, h/2, Color(255, 255, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
         
-        if hpPercent > 0.5 then
-            surface.SetDrawColor(255, 255, 0, 255)
-        elseif hpPercent > 0.2 then
-            surface.SetDrawColor(255, 165, 0, 255)
-        else
-            surface.SetDrawColor(255, 50, 0, 255)
-        end
+        -- ===== HP (по центру, ярко-красный фон, высокая полоска) =====
+        local baseBarWidth = 20
+        local extraWidthPer10HP = 5
         
-        surface.DrawRect(hpBarX, hpBarY, currentHpWidth, hpBarHeight)
+        local barWidth = baseBarWidth + ((maxHp - 20) / 10) * extraWidthPer10HP
+        barWidth = math.Clamp(barWidth, baseBarWidth, 250)
         
-        surface.SetDrawColor(255, 255, 255, 100)
-        surface.DrawOutlinedRect(hpBarX, hpBarY, hpBarWidth, hpBarHeight, 2)
+        local hpBlockWidth = 90 + barWidth
+        local hpStartX = (w / 2) - (hpBlockWidth / 2)
         
-        draw.SimpleText((UT_BATTLE_CORE.playerHp or 20).." / "..(UT_BATTLE_CORE.playerMaxHp or 20), "UT_Small", 
-            hpBarX + hpBarWidth + 5, 35, Color(255, 255, 255))
+        draw.SimpleText("HP", "UT_Attack", hpStartX, h/2, Color(255, 255, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        
+        -- ВЫСОТА ПОЛОСКИ УВЕЛИЧЕНА!
+        local barHeight = 22  -- Было 16, стало 22 (выше)
+        local barX = hpStartX + 55
+        local barY = h/2 - barHeight/2
+        
+        -- ЯРКО-КРАСНЫЙ фон (потерянное HP)
+        surface.SetDrawColor(255, 0, 0, 255)  -- ЯРКО-КРАСНЫЙ!
+        surface.DrawRect(barX, barY, barWidth, barHeight)
+        
+        -- Жёлтая полоска (оставшееся HP)
+        local hpPercent = hp / maxHp
+        local fillWidth = barWidth * hpPercent
+        surface.SetDrawColor(255, 255, 0, 255)
+        surface.DrawRect(barX, barY, fillWidth, barHeight)
+        
+        -- Цифры HP
+        local hpValueText = string.format("%d/%d", math.ceil(hp), maxHp)
+        draw.SimpleText(hpValueText, "UT_Attack", barX + barWidth + 20, h/2, Color(255, 255, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
     end
     
     if UT_BATTLE_CORE.UpdateButtonImages then
@@ -1277,6 +1296,6 @@ end
             end
         end)
     end
-    
+
     print("[UNDERTALE] Модуль интерфейса с анимацией врагов загружен")
 end

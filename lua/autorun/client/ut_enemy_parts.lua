@@ -67,9 +67,9 @@ if CLIENT then
         -- Хедкраб (только голова и ноги)
         npc_headcrab = {
             headSwingRange = 12,
-            headSwingSpeed = 2.0,
-            legsSwingRange = 8,
-            legsSwingSpeed = 1.8,
+            headSwingSpeed = 8.0,
+            legsSwingRange = 7,
+            legsSwingSpeed = 4.0,
             hasTorso = false,
             hasAllParts = false
         },
@@ -77,11 +77,11 @@ if CLIENT then
         -- Быстрый зомби
         npc_fastzombie = {
             headSwingRange = 10,
-            headSwingSpeed = 1.5,
+            headSwingSpeed = 11.5,
             torsoSwingRange = 6,
-            torsoSwingSpeed = 1.2,
+            torsoSwingSpeed = 60.2,
             legsSwingRange = 12,
-            legsSwingSpeed = 2.0,
+            legsSwingSpeed = 10.0,
             hasAllParts = true
         }
     }

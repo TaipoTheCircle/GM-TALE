@@ -41,6 +41,42 @@ if CLIENT then
             mercy_text = "* Солдат опускает оружие.",
             heart_color = "BLUE"
         },
+
+                npc_combine = {
+            name = "СОЛДАТ",
+            hp = 35,
+            maxhp = 35,
+            attack = 8,
+            defense = 3, 
+            exp = 20,
+            gold = 25,
+            check_text = "* СОЛДАТ - HP: 35, ATK: 8, DEF: 3\n* Обучен тактике и стрельбе.",
+            acts = {
+                { name = "ПРОВЕРИТЬ", text = "* Солдат прицеливается.", info = true },
+                { name = "СЛОМАТЬ ОРУЖИЕ", text = "* Оружие слишком прочное." },
+                { name = "ПЕРЕГОВОРЫ", text = "* Солдат не реагирует." }
+            },
+            mercy_text = "* Солдат опускает оружие.",
+            heart_color = "BLUE"
+        },
+
+                        npc_headcrab = {
+            name = "ХЕДКРАБ",
+            hp = 15,
+            maxhp = 15,
+            attack = 3,
+            defense = 3, 
+            exp = 10,
+            gold = 15,
+            check_text = "* ХЕДКРАБ - HP: 35, ATK: 8, DEF: 3\n* Зеновский Паразит.",
+            acts = {
+                { name = "ПРОВЕРИТЬ", text = "* Хедкраб Насторожен.", info = true },
+                { name = "НАПУГАТЬ", text = "* Хедкраб Напуган." },
+                { name = "ПОГЛАДИТЬ", text = "* Хедкраб чуствует себя странно." }
+            },
+            mercy_text = "* Хедкраб Утихомирился.",
+            heart_color = "BLUE"
+        },
         
         -- Кляйнер (Санс)
         npc_kleiner = {
