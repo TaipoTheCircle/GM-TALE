@@ -100,69 +100,80 @@ if CLIENT then
     end
     
     -- Враг контратакует
-    -- Враг контратакует
-    function UT_BATTLE_ACTION.StartEnemyTurn(enemy)
-        chat.AddText(Color(255, 100, 100), "[АТАКА ВРАГА] ", Color(255, 255, 255), 
-            "* " .. (enemy.name or "Враг") .. " атакует!")
+function UT_BATTLE_ACTION.StartEnemyTurn(enemy)
+    chat.AddText(Color(255, 100, 100), "[АТАКА ВРАГА] ", Color(255, 255, 255), 
+        "* " .. (enemy.name or "Враг") .. " атакует!")
+    
+    -- Получаем цвет сердца для врага
+    local enemy_data = UT_ENEMY_DATA.Get(enemy.class)
+    local heartColor = enemy_data and enemy_data.heart_color or "RED"
+    
+    -- Сохраняем текущую атаку врага
+    if not enemy.currentAttack then
+        enemy.currentAttack = 1
+    end
+    
+    -- Получаем конфигурацию атаки
+    local attackConfig = nil
+    if UT_ATTACK_MANAGER then
+        local attacks = UT_ATTACK_MANAGER.GetEnemyAttacks(enemy)
+        attackConfig = attacks[enemy.currentAttack]
         
-        -- Получаем цвет сердца для врага
-        local enemy_data = UT_ENEMY_DATA.Get(enemy.class)
-        local heartColor = enemy_data and enemy_data.heart_color or "RED"
-        
-        -- Запускаем фазу сердца с нужным цветом
-        if UT_HEART_SYSTEM and UT_HEART_SYSTEM.StartHeartPhase then
-            -- Определяем границы для сердца (в зависимости от текущего боя)
-            local bounds
-            if UT_BATTLE_CORE.dialogPanel and IsValid(UT_BATTLE_CORE.dialogPanel) then
-                local panel = UT_BATTLE_CORE.dialogPanel
-                local x, y = panel:GetPos()
-                local w, h = panel:GetSize()
-                bounds = {
-                    left = x + 30,
-                    right = x + w - 30,
-                    top = y + 30,
-                    bottom = y + h - 30
-                }
-            else
-                bounds = {
-                    left = ScrW()/2 - 400,
-                    right = ScrW()/2 + 400,
-                    top = ScrH()/2 - 100,
-                    bottom = ScrH()/2 + 100
-                }
-            end
-            
-            UT_HEART_SYSTEM.StartHeartPhase(heartColor, bounds, 
-                function(damage)
-                    -- Получение урона
-                    UT_BATTLE_CORE.playerHp = math.max(0, UT_BATTLE_CORE.playerHp - (damage or 2))
-                    if UT_BATTLE_CORE.playerHp <= 0 then
-                        UT_BATTLE_ACTION.GameOver()
-                    end
-                end,
-                function()
-                    -- Завершение фазы сердца
-                    UT_BATTLE_CORE.battleMode = "MENU"
-                    if UT_BATTLE_HUD and UT_BATTLE_HUD.UpdateDialogPanel then
-                        UT_BATTLE_HUD.UpdateDialogPanel()
-                    end
-                end
-            )
+        -- Переключаем на следующую атаку для следующего раза
+        enemy.currentAttack = (enemy.currentAttack % #attacks) + 1
+    end
+    
+    -- Запускаем фазу сердца с кастомными снарядами
+    if UT_HEART_SYSTEM and UT_HEART_SYSTEM.StartHeartPhase then
+        local bounds
+        if UT_BATTLE_CORE.dialogPanel and IsValid(UT_BATTLE_CORE.dialogPanel) then
+            local panel = UT_BATTLE_CORE.dialogPanel
+            local x, y = panel:GetPos()
+            local w, h = panel:GetSize()
+            bounds = {
+                left = x + 30,
+                right = x + w - 30,
+                top = y + 30,
+                bottom = y + h - 30
+            }
         else
-            -- Fallback на старую систему
-            if UT_HEART_SIMPLE and UT_HEART_SIMPLE.Start then
-                UT_HEART_SIMPLE.Start(enemy_data)
-            elseif UT_HEART_CORE and UT_HEART_CORE.StartHeartPhase then
-                UT_HEART_CORE.StartHeartPhase(enemy_data)
-            else
-                print("[UNDERTALE] Нет системы сердца!")
+            bounds = {
+                left = ScrW()/2 - 400,
+                right = ScrW()/2 + 400,
+                top = ScrH()/2 - 100,
+                bottom = ScrH()/2 + 100
+            }
+        end
+        
+        -- Создаём снаряды для атаки
+        local bullets = {}
+        if UT_ATTACK_MANAGER and attackConfig then
+            bullets = UT_ATTACK_MANAGER.CreateAttackBullets(enemy, (enemy.currentAttack or 1) - 1)
+        end
+        
+        -- Передаём снаряды в систему сердца
+        UT_HEART_SYSTEM.StartHeartPhase(heartColor, bounds, 
+            function(damage)
+                UT_BATTLE_CORE.playerHp = math.max(0, UT_BATTLE_CORE.playerHp - (damage or 2))
+                if UT_BATTLE_CORE.playerHp <= 0 then
+                    UT_BATTLE_ACTION.GameOver()
+                end
+            end,
+            function()
                 UT_BATTLE_CORE.battleMode = "MENU"
                 if UT_BATTLE_HUD and UT_BATTLE_HUD.UpdateDialogPanel then
                     UT_BATTLE_HUD.UpdateDialogPanel()
                 end
-            end
+            end,
+            { bullets = bullets, duration = attackConfig and attackConfig.duration or 8 }
+        )
+    else
+        -- Fallback на старую систему
+        if UT_HEART_SIMPLE and UT_HEART_SIMPLE.Start then
+            UT_HEART_SIMPLE.Start(enemy_data)
         end
     end
+end
     
     -- ACT: Действие (как в Undertale) - С ВЫБОРОМ ЦЕЛИ
     function UT_BATTLE_ACTION.PerformAct(act_index)

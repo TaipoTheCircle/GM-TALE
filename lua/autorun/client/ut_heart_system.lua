@@ -223,6 +223,28 @@ if CLIENT then
             UT_HEART_SYSTEM.DrawHeart(UT_HEART_SYSTEM.heartX, UT_HEART_SYSTEM.heartY, heartSize, false)
         end
   
+        -- Отрисовка кастомных снарядов
+if UT_HEART_SYSTEM.bullets then
+    for _, bullet in ipairs(UT_HEART_SYSTEM.bullets) do
+        if bullet.texture and not bullet.texture:IsError() then
+            surface.SetDrawColor(255, 255, 255, 255)
+            surface.SetMaterial(bullet.texture)
+            surface.DrawTexturedRect(
+                bullet.x - bullet.size/2,
+                bullet.y - bullet.size/2,
+                bullet.size, bullet.size
+            )
+        else
+            surface.SetDrawColor(bullet.color.r, bullet.color.g, bullet.color.b, 255)
+            surface.DrawRect(
+                bullet.x - bullet.size/2,
+                bullet.y - bullet.size/2,
+                bullet.size, bullet.size
+            )
+        end
+    end
+end
+
         
         -- Подсказка для синей души
         if UT_HEART_SYSTEM.currentType == "BLUE" then

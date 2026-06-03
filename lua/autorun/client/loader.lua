@@ -46,8 +46,8 @@ AddCSLuaFile("ut_hotfix.lua")
 include("ut_hotfix.lua")
 
 -- 6.6. Атаки врагов (НОВЫЙ)
-AddCSLuaFile("ut_enemy_attacks.lua")
-include("ut_enemy_attacks.lua")
+--AddCSLuaFile("ut_enemy_attacks.lua")
+--include("ut_enemy_attacks.lua")
 
 -- 6.7. Система печатания текста (НОВЫЙ)
 AddCSLuaFile("ut_typing.lua")
@@ -104,6 +104,18 @@ include("ut_save_system.lua")
 -- 16. Интерфейс игрока
 AddCSLuaFile("ut_theme.lua")
 include("ut_theme.lua")
+
+-- 17. Кастомные Атаки
+AddCSLuaFile("ut_custom_attacks.lua")
+include("ut_custom_attacks.lua")
+
+-- 18. Менеджер Атаки
+AddCSLuaFile("ut_attack_manager.lua")
+include("ut_attack_manager.lua")
+
+-- 19. Нихилант
+AddCSLuaFile("ut_nihilanth_battle.lua")
+include("ut_nihilanth_battle.lua")
 
 -- Автосообщение
 timer.Simple(10, function()

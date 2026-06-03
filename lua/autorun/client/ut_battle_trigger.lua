@@ -12,15 +12,20 @@ if CLIENT then
     UT_BATTLE_TRIGGER.playerWasInvincible = false
     
     -- ТИПЫ ВРАГОВ
-    UT_BATTLE_TRIGGER.EnemyTypes = {
-        ["npc_zombie"] = {
-            name = "ЗОМБИ",
-            hp = 25,
-            maxhp = 25,
-            class = "npc_zombie",
-            attacks = {{ type = "SNIPER", speed = 200, count = 8, color = Color(255, 50, 50) }},
-            dialog = { "* Зомби медленно приближается...", "* Вы чувствуете запах гниения", "* Зомби Рычит" }
+    -- ТИПЫ ВРАГОВ (с кастомными атаками)
+UT_BATTLE_TRIGGER.EnemyTypes = {
+    ["npc_zombie"] = {
+        name = "ЗОМБИ",
+        hp = 25,
+        maxhp = 25,
+        class = "npc_zombie",
+        customAttacks = {  -- НОВЫЙ ФОРМАТ!
+            { type = "Projectile", count = 3, speed = 200, damage = 2, texture = "attack", color = Color(100, 255, 100) },
+            { type = "Rain", count = 8, speed = 250, damage = 2, size = 18 },
+            { type = "Wave", waves = 2, speed = 180, damage = 2 }
         },
+        dialog = { "* Зомби медленно приближается...", "* Вы чувствуете запах гниения", "* Зомби Рычит" }
+    },
         
           --["npc_kleiner"] = {
            --   name = "КЛЯЙНЕР",
@@ -32,66 +37,81 @@ if CLIENT then
            --   dialog = { "* хех...", "* ты думал я буду просто стоять?", "* получай." }
          -- },
 
-        ["npc_combine_s"] = {
-            name = "СОЛДАТ",
-            hp = 30,
-            maxhp = 30,
-            class = "npc_combine_s",
-            attacks = {
-                { type = "SNIPER", speed = 250, count = 12, color = Color(0, 255, 255) },
-                { type = "WAVE", speed = 180, count = 5, color = Color(255, 255, 0) }
-            },
-            dialog = { "* Солдат Overwatch нацеливается на вас", "* Слышен звук заряжания оружия", '* Солдат Overwatch говорит: "Стоять!"' }
+            ["npc_combine_s"] = {
+        name = "СОЛДАТ",
+        hp = 30,
+        maxhp = 30,
+        class = "npc_combine_s",
+        customAttacks = {
+            { type = "Projectile", count = 5, speed = 350, damage = 3, texture = "attack", color = Color(0, 200, 255) },
+            { type = "Laser", count = 2, damage = 5, width = 12 },
+            { type = "Homing", count = 2, speed = 250, damage = 3, homingStrength = 3 }
         },
+        dialog = { "* Солдат Overwatch нацеливается на вас", "* Слышен звук заряжания оружия", '* Солдат Overwatch говорит: "Стоять!"' }
+    },
 
-        ["npc_combine"] = {
-            name = "СОЛДАТ",
-            hp = 30,
-            maxhp = 30,
-            class = "npc_combine",
-            attacks = {
-                { type = "SNIPER", speed = 250, count = 12, color = Color(0, 255, 255) },
-                { type = "WAVE", speed = 180, count = 5, color = Color(255, 255, 0) }
-            },
-            dialog = { "* Солдат Overwatch нацеливается на вас", "* Слышен звук заряжания оружия", '* Солдат Overwatch говорит: "Стоять!"' }
+    ["npc_combine"] = {
+        name = "СОЛДАТ",
+        hp = 30,
+        maxhp = 30,
+        class = "npc_combine",
+        customAttacks = {
+            { type = "Projectile", count = 5, speed = 350, damage = 3, texture = "attack", color = Color(0, 200, 255) },
+            { type = "Laser", count = 2, damage = 5, width = 12 },
+            { type = "Homing", count = 2, speed = 250, damage = 3, homingStrength = 3 }
         },
-        
-        ["npc_antlion"] = {
-            name = "МУРАВЬИННЫЙ ЛЕВ",
-            hp = 35,
-            maxhp = 35,
-            class = "npc_antlion",
-            attacks = { { type = "CIRCLE", speed = 150, count = 16, color = Color(255, 150, 0) } },
-            dialog = { "* Муравьинный Лев рычит", "* Муравьинный Лев готовится к прыжку", "* Острые когти блестят" }
+        dialog = { "* Солдат Overwatch нацеливается на вас", "* Слышен звук заряжания оружия", '* Солдат Overwatch говорит: "Стоять!"' }
+    },
+    
+    ["npc_antlion"] = {
+        name = "МУРАВЬИННЫЙ ЛЕВ",
+        hp = 35,
+        maxhp = 35,
+        class = "npc_antlion",
+        customAttacks = {
+            { type = "Circle", count = 16, speed = 180, damage = 3, radius = 250, color = Color(255, 150, 0) },
+            { type = "Arc", count = 5, speed = 220, damage = 4, arcHeight = 150 },
+            { type = "Projectile", count = 4, speed = 280, damage = 3, texture = "attack" }
         },
-        
-        ["npc_antlionworker"] = {
-            name = "РАБОЧИЙ МУРАВЬИННЫХ ЛЬВОВ",
-            hp = 20,
-            maxhp = 20,
-            class = "npc_antlionworker",
-            attacks = { { type = "WAVE", speed = 120, count = 6, color = Color(150, 255, 150) } },
-            dialog = { "* Рабочий суетится", "* Рабочий выглядит слабее других", "* Рабочий все ещё опасен" }
+        dialog = { "* Муравьинный Лев рычит", "* Муравьинный Лев готовится к прыжку", "* Острые когти блестят" }
+    },
+    
+    ["npc_antlionworker"] = {
+        name = "РАБОЧИЙ МУРАВЬИННЫХ ЛЬВОВ",
+        hp = 20,
+        maxhp = 20,
+        class = "npc_antlionworker",
+        customAttacks = {
+            { type = "Wave", waves = 2, speed = 120, damage = 2, color = Color(150, 255, 150) },
+            { type = "Projectile", count = 3, speed = 150, damage = 2 }
         },
-        
-        ["npc_headcrab"] = {
-            name = "ХЕДКРАБ",
-            hp = 15,
-            maxhp = 15,
-            class = "npc_headcrab",
-            attacks = { { type = "SNIPER", speed = 180, count = 4, color = Color(255, 100, 100) } },
-            dialog = { "* Хедкраб прыгает!", "* Хедкраб пытается укусить", "* Хедкраб - маленький, но опасный" }
+        dialog = { "* Рабочий суетится", "* Рабочий выглядит слабее других", "* Рабочий все ещё опасен" }
+    },
+    
+    ["npc_headcrab"] = {
+        name = "ХЕДКРАБ",
+        hp = 15,
+        maxhp = 15,
+        class = "npc_headcrab",
+        customAttacks = {
+            { type = "Projectile", count = 4, speed = 180, damage = 2, color = Color(255, 100, 100) },
+            { type = "Homing", count = 2, speed = 200, damage = 2, homingStrength = 2 }
         },
-        
-        ["npc_fastzombie"] = {
-            name = "БЫСТРЫЙ ЗОМБИ",
-            hp = 40,
-            maxhp = 40,
-            class = "npc_fastzombie",
-            attacks = { { type = "SNIPER", speed = 300, count = 10, color = Color(255, 0, 0) } },
-            dialog = { "* Быстрый зомби бежит!", "* Быстрый зомби очень быстрый!", "* Будь осторожен!" }
-        }
+        dialog = { "* Хедкраб прыгает!", "* Хедкраб пытается укусить", "* Хедкраб - маленький, но опасный" }
+    },
+    
+    ["npc_fastzombie"] = {
+        name = "БЫСТРЫЙ ЗОМБИ",
+        hp = 40,
+        maxhp = 40,
+        class = "npc_fastzombie",
+        customAttacks = {
+            { type = "Projectile", count = 10, speed = 300, damage = 3, color = Color(255, 0, 0) },
+            { type = "Rain", count = 12, speed = 280, damage = 2, size = 15 }
+        },
+        dialog = { "* Быстрый зомби бежит!", "* Быстрый зомби очень быстрый!", "* Будь осторожен!" }
     }
+}
     
     -- ВКЛЮЧЕНИЕ НЕУЯЗВИМОСТИ
     UT_BATTLE_TRIGGER.EnableInvincibility = function()
